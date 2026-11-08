@@ -342,7 +342,7 @@ export async function orderView(env: Env, order: OrderRow, origin: string) {
 }
 
 export async function orderEvents(env: Env, id: string) {
-  const r = await env.DB.prepare('SELECT type, data_json, created_at FROM events WHERE order_id = ? ORDER BY id').bind(id).all<{ type: string; data_json: string; created_at: number }>();
+  const r = await env.DB.prepare('SELECT type, data_json, created_at FROM events WHERE order_id = ? ORDER BY created_at, id').bind(id).all<{ type: string; data_json: string; created_at: number }>();
   return r.results.map(e => ({ type: e.type, data: JSON.parse(e.data_json || '{}'), at: e.created_at }));
 }
 
