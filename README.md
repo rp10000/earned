@@ -4,7 +4,7 @@
 
 - **Live demo:** https://earned.loo2maaa.workers.dev (PayPal sandbox, real AI models)
 - **MCP server for any AI agent:** `https://earned.loo2maaa.workers.dev/mcp`
-- **Demo video:** _link added at submission_
+- **Demo video:** https://www.youtube.com/watch?v=HzYOj38yoPw
 
 Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/) (Oct–Nov 2026). New project, MIT licensed.
 
