@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Earned · Pay AI only for what works</title>
+<meta name="description" content="Earned holds the money with PayPal, lets AI inspectors check every result against the checklist you agreed on, and captures only what passed. Open source.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<main>
+  <div class="wrap hero">
+    <div class="eyebrow">PayPal + AI · pay-per-pass commerce</div>
+    <h1 class="display">Pay AI only for<br><em>what works.</em></h1>
+    <p class="lede">Today you pay for AI before you know if it worked. Earned flips that. PayPal holds the money, independent AI inspectors check every result against the checklist you agreed on, and PayPal captures only what passed. The rest goes straight back to you.</p>
+    <div class="btn-row" style="margin-top:26px">
+      <a class="btn" href="/studio">Order a custom card</a>
+      <a class="btn ghost" href="/agent">Let an AI agent buy it for you</a>
+    </div>
+    <p class="small muted" style="margin-top:14px">Live demo · PayPal sandbox (no real money) · real image and vision models · every verdict is a signed receipt</p>
+
+    <div class="card pad" id="live" style="margin-top:40px">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline">
+        <div><div class="eyebrow" style="margin:0" id="live-label">Example settlement</div>
+          <div style="font-weight:700;font-size:18px" id="live-title">4 holiday cards · Paper Lantern</div></div>
+        <div class="small muted" id="live-meta">3 of 4 passed the signed checklist</div>
+      </div>
+      <div style="margin-top:16px" id="live-bar"></div>
+    </div>
+  </div>
+
+  <hr class="soft">
+  <section>
+    <div class="wrap grid c2" style="align-items:start;gap:48px">
+      <div>
+        <div class="eyebrow">How it works</div>
+        <h2 class="section">The price is decided by the result, not the seller.</h2>
+        <p class="muted">Every step is a real PayPal call: an Orders v2 authorization, a partial capture with <code>final_capture</code>, a void when nothing passed, refunds for upheld appeals, and webhooks that confirm each one.</p>
+      </div>
+      <div class="steps">
+        <div class="step"><div><h3>Agree the checklist</h3><p>AI turns "a card for my cats" into 3–6 checkable facts: exact text, counts, colours, exclusions. You edit it. Its hash is written into the PayPal order.</p></div></div>
+        <div class="step"><div><h3>PayPal holds the money</h3><p>An authorization, not a charge. The studio knows the money is real; you know it hasn't moved.</p></div></div>
+        <div class="step"><div><h3>Two AI inspectors check every result</h3><p>Two different vision models judge each image item by item and quote their evidence. If they disagree, a third, stronger model decides.</p></div></div>
+        <div class="step"><div><h3>PayPal captures only what passed</h3><p>3 of 4 passed? You pay for 3; the rest of the hold is released. A signed receipt records the outcome forever.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="soft">
+  <section>
+    <div class="wrap">
+      <div class="eyebrow">Why it matters</div>
+      <h2 class="section" style="max-width:820px">AI is the first product that is sold before anyone knows whether it worked.</h2>
+      <div class="grid c3" style="margin-top:26px">
+        <div class="card pad"><h3>Buyers hesitate</h3><p class="muted">We run small AI tools. Our paying customers arrive from chat assistants on their phones, and they stall at the same moment: paying before they have seen the result. Free previews help; a guarantee that is enforced by the payment itself helps more.</p></div>
+        <div class="card pad"><h3>Refunds are binary and slow</h3><p class="muted">Today a bad result means a refund request, a dispute, or nothing. Most results are not all bad; they are 3 of 4 good. Pay-per-pass settles that in seconds, in proportion, with evidence.</p></div>
+        <div class="card pad"><h3>Agents can't complain</h3><p class="muted">When an AI agent buys from another AI, no human is watching. The only workable rule is: verify, then settle. Earned is that rule as a protocol, running on PayPal.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="soft">
+  <section>
+    <div class="wrap">
+      <div class="eyebrow">Where this goes</div>
+      <h2 class="section">Every payment becomes a vote.</h2>
+      <p class="lede">Money flows to AI that works. AI that doesn't stops getting paid. The market does the quality control.</p>
+      <div class="grid c3" style="margin-top:26px">
+        <div class="card pad"><span class="tag paid">Today</span><h3 style="margin-top:12px">Outcome pricing for any AI tool</h3><p class="muted">One integration turns a pay-first AI product into a pay-per-pass one. Higher conversion, fewer disputes, a guarantee customers can see.</p></div>
+        <div class="card pad"><span class="tag held">Next</span><h3 style="margin-top:12px">A credit score for every AI</h3><p class="muted">Benchmarks get gamed and reviews get faked. Pass rates from settled money are hard to fake. The <a href="/quality">Quality Index</a> ranks AI studios by what buyers actually paid for, and agents read it before they buy.</p></div>
+        <div class="card pad"><span class="tag released">Endgame</span><h3 style="margin-top:12px">The settlement layer of the agent economy</h3><p class="muted">Billions of agent-to-agent purchases, no human to check any of them. Whoever verifies outcomes decides where the money goes. With PayPal, that layer reaches hundreds of millions of accounts on day one.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="soft">
+  <section>
+    <div class="wrap">
+      <div style="display:flex;justify-content:space-between;align-items:end;gap:16px;flex-wrap:wrap">
+        <div><div class="eyebrow">Live Quality Index</div><h2 class="section" style="margin:0">Ranked by settled money</h2></div>
+        <a class="btn ghost small" href="/quality">Full index and receipts</a>
+      </div>
+      <div class="grid c4" id="mini-index" style="margin-top:22px"></div>
+    </div>
+  </section>
+
+  <hr class="soft">
+  <section>
+    <div class="wrap grid c2" style="gap:40px;align-items:center">
+      <div>
+        <div class="eyebrow">For agents and developers</div>
+        <h2 class="section">Your agent can shop. It can't pay.</h2>
+        <p class="muted">Add the MCP server to any AI client. It can rank studios, draft the checklist, open an order and report the verdict, but the PayPal approval always goes to a human. Receipts are Ed25519-signed so other agents can verify outcomes without trusting us.</p>
+        <div class="btn-row"><a class="btn ghost small" href="/developers">MCP, API and receipt docs</a></div>
+      </div>
+      <pre class="json" id="mcp-snippet">{
+  "mcpServers": {
+    "earned": { "url": "https://…/mcp" }
+  }
+}</pre>
+    </div>
+  </section>
+</main>
+<script type="module">
+import { $, api, esc, moneyBar, pct } from '/common.js';
+$('#mcp-snippet').textContent = JSON.stringify({ mcpServers: { earned: { url: location.origin + '/mcp' } } }, null, 2);
+const example = { authorized: '6.00', captured: '4.50', released: '1.50', refunded: '0.00', on_hold: '0' };
+$('#live-bar').innerHTML = moneyBar({ authorized: '6.00', captured: '0', released: '0', on_hold: '6.00' });
+setTimeout(() => { $('#live-bar').innerHTML = moneyBar(example); }, 900);
+try {
+  const idx = await api('/api/index');
+  const last = idx.recent?.[0];
+  if (last) {
+    $('#live-label').textContent = 'Latest real settlement';
+    $('#live-title').textContent = `${last.quantity} images · ${last.studio}`;
+    $('#live-meta').innerHTML = `${last.passed} of ${last.quantity} passed · <a href="/receipts/${esc(last.id)}">signed receipt</a>`;
+    const m = { authorized: last.authorized, captured: last.captured, released: last.released, refunded: '0', on_hold: '0' };
+    $('#live-bar').innerHTML = moneyBar({ authorized: last.authorized, captured: '0', released: '0', on_hold: last.authorized });
+    setTimeout(() => { $('#live-bar').innerHTML = moneyBar(m); }, 900);
+  }
+  $('#mini-index').innerHTML = idx.studios.map((s, i) => `<div class="card stat">
+      <div class="small muted">#${i + 1} · ${esc(s.name)}</div>
+      <div class="v">${pct(s.pass_rate)}</div>
+      <div class="l">pass rate · ${s.items_judged} images judged</div>
+      <div class="bar" style="margin-top:10px"><span style="width:${(s.pass_rate || 0) * 100}%;background:${esc(s.accent)}"></span></div>
+    </div>`).join('');
+} catch (e) { $('#mini-index').innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+</script>
+</body>
+</html>

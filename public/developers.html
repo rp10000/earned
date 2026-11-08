@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Developers · Earned</title>
+<meta name="description" content="Connect any AI client to Earned over MCP, create pay-per-pass orders over HTTP, and verify signed verdict receipts.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<main class="wrap narrow" style="padding-top:44px;padding-bottom:64px">
+  <div class="eyebrow">Developers</div>
+  <h1 class="display" style="font-size:clamp(36px,5.5vw,56px)">Plug pay-per-pass into<br><em>any agent or AI tool.</em></h1>
+
+  <section style="padding:30px 0">
+    <h2>1 · MCP server</h2>
+    <p>Remote MCP over Streamable HTTP, no auth needed for the sandbox demo. Add it to any MCP client by URL:</p>
+    <pre class="json" id="mcp-url"></pre>
+    <table class="idx" style="margin-top:12px">
+      <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>search_quality_index</code></td><td>Ranks studios by money-backed pass rate (read-only).</td></tr>
+        <tr><td><code>draft_acceptance_checklist</code></td><td>Turns the buyer's words into 3–6 checkable criteria.</td></tr>
+        <tr><td><code>create_outcome_order</code></td><td>Opens the order and a PayPal <b>authorization</b>. Returns <code>approve_url</code> for the human. The agent cannot approve it.</td></tr>
+        <tr><td><code>get_order_status</code></td><td>Moves the order forward and returns verdicts, evidence, money captured/released and the receipt URL.</td></tr>
+        <tr><td><code>verify_receipt</code></td><td>Checks the Ed25519 signature of a verdict receipt.</td></tr>
+      </tbody>
+    </table>
+    <p class="small muted">Try it from a terminal:</p>
+    <pre class="json" id="curl"></pre>
+  </section>
+
+  <section style="padding:30px 0">
+    <h2>2 · The money flow (PayPal REST, sandbox)</h2>
+    <ol>
+      <li><code>POST /v2/checkout/orders</code> with <code>intent: "AUTHORIZE"</code>. The contract hash goes into <code>purchase_units[0].custom_id</code>; the line item is quantity × unit price.</li>
+      <li>The buyer approves on PayPal. On return (or on the <code>CHECKOUT.ORDER.APPROVED</code> webhook) we call <code>POST /v2/checkout/orders/{id}/authorize</code>. Funds are held, not charged.</li>
+      <li>The studio generates; two vision models judge each image against the checklist; a third breaks ties.</li>
+      <li>If anything passed: <code>POST /v2/payments/authorizations/{id}/capture</code> for exactly passed × unit price with <code>final_capture: true</code>, which releases the remainder. If nothing passed: <code>POST /v2/payments/authorizations/{id}/void</code>.</li>
+      <li>Buyer appeals that are upheld by a stronger model trigger <code>POST /v2/payments/captures/{id}/refund</code> for that item.</li>
+      <li>Webhooks are verified with <code>/v1/notifications/verify-webhook-signature</code> and recorded on the order's PayPal trail.</li>
+    </ol>
+  </section>
+
+  <section style="padding:30px 0">
+    <h2>3 · HTTP API</h2>
+    <table class="idx">
+      <tbody>
+        <tr><td><code>GET /api/index</code></td><td>Quality Index and latest receipts</td></tr>
+        <tr><td><code>POST /api/criteria</code></td><td><code>{ brief }</code> → <code>{ title, criteria[] }</code></td></tr>
+        <tr><td><code>POST /api/orders</code></td><td><code>{ studio_id, brief, criteria[], quantity }</code> → order + <code>approve_url</code></td></tr>
+        <tr><td><code>GET /api/orders/:id</code></td><td>Order, items, verdicts, money and PayPal trail (also advances the order)</td></tr>
+        <tr><td><code>POST /api/orders/:id/appeal</code></td><td><code>{ item, reason }</code> → re-inspection, refund if upheld</td></tr>
+        <tr><td><code>GET /api/receipts/:id</code></td><td>Signed receipt, canonical payload, signature</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section style="padding:30px 0">
+    <h2>4 · Verify a receipt yourself</h2>
+    <p>Receipts are Ed25519 signatures over canonical JSON (keys sorted). The public key is at <a href="/.well-known/earned-receipt-key.json"><code>/.well-known/earned-receipt-key.json</code></a>.</p>
+    <pre class="json">const r = await (await fetch(origin + '/api/receipts/' + id)).json();
+const { keys: [jwk] } = await (await fetch(r.public_key_url)).json();
+const key = await crypto.subtle.importKey('jwk', jwk, { name: 'Ed25519' }, false, ['verify']);
+const ok = await crypto.subtle.verify({ name: 'Ed25519' }, key,
+  base64urlDecode(r.signature), new TextEncoder().encode(r.canonical));</pre>
+  </section>
+
+  <section style="padding:30px 0">
+    <h2>Source</h2>
+    <p>MIT licensed. Cloudflare Workers + D1 + R2, TypeScript, no frameworks. Run it locally with your own PayPal sandbox app and any OpenAI-compatible model gateway: see the README.</p>
+  </section>
+</main>
+<script type="module">
+import { $ } from '/common.js';
+$('#mcp-url').textContent = JSON.stringify({ mcpServers: { earned: { url: location.origin + '/mcp' } } }, null, 2);
+$('#curl').textContent = `curl -s ${location.origin}/mcp -H 'content-type: application/json' \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search_quality_index","arguments":{"task":"card with exact text"}}}'`;
+</script>
+</body>
+</html>

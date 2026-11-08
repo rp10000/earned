@@ -1,0 +1,21 @@
+# Earned
+
+> Pay AI only for what works. PayPal holds the buyer's money, AI inspectors check every result against a checklist the buyer agreed on, and PayPal captures only the results that passed. The rest of the hold is released. This deployment is a demo on the PayPal sandbox.
+
+## For AI agents
+- MCP server (Streamable HTTP, no auth): /mcp
+- Tools: search_quality_index, draft_acceptance_checklist, create_outcome_order, get_order_status, verify_receipt
+- You cannot approve payments. create_outcome_order returns an approve_url that a human must open on PayPal.
+- Nothing is charged for items that fail inspection.
+
+## Pages
+- [Order a card](/studio): pick a studio, agree the checklist, hold with PayPal
+- [Shopping agent](/agent): an AI agent that buys pay-per-pass on your behalf
+- [Quality Index](/quality): AI studios ranked by money-backed pass rate
+- [Developers](/developers): MCP, HTTP API, receipt verification
+
+## Facts
+- Unit price: $1.50 per image that passes (sandbox)
+- Inspectors: two vision models judge independently; a stronger third model breaks ties
+- Receipts: Ed25519-signed, public key at /.well-known/earned-receipt-key.json
+- License: MIT

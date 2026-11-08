@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shopping agent · Earned</title>
+<meta name="description" content="An AI agent that buys custom cards for you on a pay-per-pass basis. It can shop; only you can approve the PayPal hold.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<style>
+  footer.site { display: none; }
+  .thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+  .thumbs figure { margin: 0; position: relative; border-radius: 8px; overflow: hidden; aspect-ratio: 1; background: var(--panel-2); }
+  .thumbs figure img { width: 100%; height: 100%; object-fit: cover; }
+  .thumbs figure figcaption { position: absolute; left: 6px; bottom: 6px; }
+  .note { text-align: center; font-size: 12.5px; color: var(--ink-3); margin: 10px 0; }
+  .starters { display: grid; gap: 8px; margin-top: 18px; }
+  .rankrow { display: grid; grid-template-columns: 1fr auto; gap: 8px; font-size: 14px; padding: 4px 0; }
+</style>
+</head>
+<body>
+<div class="chat">
+  <div class="scroll" id="scroll">
+    <div class="wrap narrow" id="log">
+      <div id="intro">
+        <div class="eyebrow">Shopping agent</div>
+        <h1 style="font-family:var(--serif);font-weight:400;font-size:clamp(30px,4.6vw,46px)">Tell it what you want.<br>It finds the studio that gets it right, and you pay only for what passes.</h1>
+        <p class="muted">The agent uses the same tools any AI client gets from our <a href="/developers">MCP server</a>. It can rank studios, write the checklist and open the order. It cannot pay: the PayPal hold is always approved by you.</p>
+        <div class="starters" id="starters"></div>
+      </div>
+    </div>
+  </div>
+  <div class="composer">
+    <div class="wrap narrow">
+      <form id="form"><textarea id="input" placeholder="I need a birthday card for my mum…" rows="1" maxlength="1500"></textarea><button class="btn" id="send">Send</button></form>
+    </div>
+  </div>
+</div>
+<script type="module">
+import { $, $$, api, esc, pct, usd } from '/common.js';
+
+const STARTERS = [
+  'I need a birthday card for my mum: exactly 7 yellow tulips in a glass vase, and the text "Happy 60th, Linda! Love, Sam & Priya".',
+  'Make a holiday card with exactly three cats on a blue sofa (one black, one orange, one white) that says "Happy Holidays from Wei Ling, Arjun & Mochi — Singapore 2026".',
+  'Which studio is best at getting text right, and why should I trust that number?',
+];
+let history = [];
+const watching = new Set();
+
+$('#starters').innerHTML = STARTERS.map(s => `<button class="chip" style="font-size:14px">${esc(s)}</button>`).join('');
+$$('#starters .chip').forEach(b => b.onclick = () => send(b.textContent));
+
+const log = $('#log');
+const scroll = () => { $('#scroll').scrollTop = $('#scroll').scrollHeight; };
+function add(html) { const d = document.createElement('div'); d.innerHTML = html; log.append(...d.childNodes); scroll(); return log.lastElementChild; }
+const bubble = (who, text) => add(`<div class="msg ${who}"><div class="bubble">${esc(text)}</div></div>`);
+
+function toolCard(ev) {
+  const r = ev.result;
+  if (ev.error) return `<div class="tool"><div class="card"><div class="tname">${esc(ev.tool)}</div><div class="error">${esc(ev.error)}</div></div></div>`;
+  if (ev.tool === 'search_quality_index') {
+    return `<div class="tool"><div class="card"><div class="tname">search_quality_index · ranked by settled PayPal money</div>
+      ${r.studios.map((s, i) => `<div class="rankrow"><span>${i + 1}. <b>${esc(s.name)}</b> <span class="small muted">${s.items_judged} images judged</span></span><span><b>${s.pass_rate === null ? '—' : s.pass_rate + '%'}</b></span></div>`).join('')}</div></div>`;
+  }
+  if (ev.tool === 'draft_acceptance_checklist') {
+    return `<div class="tool"><div class="card"><div class="tname">draft_acceptance_checklist · this becomes the contract</div>
+      <ol style="margin:0;padding-left:20px">${r.criteria.map(c => `<li style="margin:3px 0">${esc(c.text)}</li>`).join('')}</ol></div></div>`;
+  }
+  if (ev.tool === 'create_outcome_order') {
+    return `<div class="tool" data-order="${esc(r.order_id)}"><div class="card"><div class="tname">create_outcome_order · ${esc(r.order_id)}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div><b>Hold up to ${usd(r.max_amount_usd)}</b><div class="small muted">Your agent can't approve this. Nothing is charged for images that fail.</div></div>
+        <button class="btn btn-paypal approve" data-url="${esc(r.approve_url)}" data-order="${esc(r.order_id)}">Approve hold with <b>PayPal</b></button>
+      </div><div class="live small muted" style="margin-top:10px"></div><div class="thumbs"></div></div></div>`;
+  }
+  if (ev.tool === 'get_order_status') {
+    return `<div class="tool"><div class="card"><div class="tname">get_order_status · ${esc(r.order_id)} · ${esc(r.status)}</div>
+      <div class="small">Paid ${usd(r.money.captured)} · released ${usd(r.money.released)}${r.receipt_url ? ` · <a href="${esc(r.receipt_url)}" target="_blank">signed receipt</a>` : ''}</div>
+      <div class="thumbs">${r.items.map(i => i.image ? `<figure><img src="${esc(i.image)}" alt=""><figcaption><span class="tag ${i.verdict === 'pass' ? 'paid' : i.verdict ? 'released' : 'neutral'}">${i.verdict === 'pass' ? 'paid' : i.verdict ? 'free' : '…'}</span></figcaption></figure>` : '<figure class="shimmer"></figure>').join('')}</div></div></div>`;
+  }
+  if (ev.tool === 'verify_receipt') {
+    return `<div class="tool"><div class="card"><div class="tname">verify_receipt</div><span class="verified ${r.verified ? 'ok' : 'bad'}">${r.verified ? '✓ Ed25519 signature valid' : '✕ ' + esc(r.reason || 'invalid')}</span></div></div>`;
+  }
+  return '';
+}
+
+async function watch(orderId) {
+  if (watching.has(orderId)) return;
+  watching.add(orderId);
+  const card = $(`.tool[data-order="${orderId}"]`);
+  let status = '';
+  while (true) {
+    let o;
+    try { o = (await api(`/api/orders/${orderId}`)).order; } catch { await new Promise(r => setTimeout(r, 3000)); continue; }
+    if (card) {
+      $('.live', card).textContent = o.status === 'awaiting_approval' ? 'Waiting for your approval on PayPal…' : (o.status_detail || o.status);
+      $('.thumbs', card).innerHTML = o.items.map(i => i.image ? `<figure><img src="${esc(i.image)}" alt=""><figcaption>${i.verdict ? `<span class="tag ${i.verdict === 'pass' ? 'paid' : 'released'}">${i.verdict === 'pass' ? 'paid' : 'free'}</span>` : ''}</figcaption></figure>` : '<figure class="shimmer"></figure>').join('');
+      if (o.status !== 'awaiting_approval') { const b = $('.approve', card); if (b) b.replaceWith(Object.assign(document.createElement('span'), { className: 'tag paid', textContent: 'Approved by you' })); }
+    }
+    if (o.status !== status && ['authorized', 'settled', 'voided', 'failed'].includes(o.status)) {
+      status = o.status;
+      if (o.status === 'authorized') add(`<div class="note">PayPal hold approved · ${esc(o.studio.name)} is starting</div>`);
+      else {
+        while (busy) await new Promise(r => setTimeout(r, 500));
+        await send(`(Update: order ${orderId} is now ${o.status}. Please report the outcome.)`, true);
+        return;
+      }
+    }
+    if (['settled', 'voided', 'failed', 'cancelled'].includes(o.status)) return;
+    await new Promise(r => setTimeout(r, o.status === 'awaiting_approval' ? 4000 : 1500));
+  }
+}
+
+log.addEventListener('click', e => {
+  const b = e.target.closest('.approve');
+  if (!b) return;
+  window.open(b.dataset.url, 'paypal', 'width=500,height=760');
+  watch(b.dataset.order);
+});
+
+let busy = false;
+async function send(text, silent = false) {
+  if (busy || !text.trim()) return;
+  busy = true; $('#send').disabled = true;
+  $('#intro')?.remove();
+  if (silent) add(`<div class="note">${esc(text.replace(/^\(|\)$/g, ''))}</div>`); else bubble('user', text);
+  const typing = add('<div class="typing"><span class="spin"></span> Agent is working…</div>');
+  try {
+    const out = await api('/api/agent', { method: 'POST', body: { history, message: text } });
+    typing.remove();
+    history = out.history;
+    for (const ev of out.events) {
+      add(toolCard(ev));
+      if (ev.tool === 'create_outcome_order' && ev.result?.order_id) watching.delete(ev.result.order_id);
+    }
+    bubble('agent', out.reply);
+  } catch (e) { typing.remove(); add(`<div class="error" style="margin:10px 0">${esc(e.message)}</div>`); }
+  busy = false; $('#send').disabled = false; $('#input').focus();
+}
+
+$('#form').onsubmit = e => { e.preventDefault(); const t = $('#input').value; $('#input').value = ''; send(t); };
+$('#input').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#form').requestSubmit(); } });
+</script>
+</body>
+</html>

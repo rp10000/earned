@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Order · Earned</title>
+<meta name="description" content="Order custom AI cards and posters. PayPal holds the money; you pay only for images that pass the checklist.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<main class="wrap" style="padding-top:44px;padding-bottom:64px">
+  <div class="eyebrow">Pay-per-pass order</div>
+  <h1 class="display" style="font-size:clamp(36px,5.5vw,60px)">Order a custom card.<br><em>Pay only for the ones that pass.</em></h1>
+
+  <div class="grid" style="gap:28px;margin-top:34px">
+    <div>
+      <h3>1 · Pick a studio</h3>
+      <p class="muted small" style="margin-top:0">Ranked by money-backed pass rate. Every studio sells at the same price; they differ in how often their work is actually right.</p>
+      <div class="studios" id="studios"><div class="studio shimmer" style="height:120px"></div><div class="studio shimmer"></div><div class="studio shimmer"></div><div class="studio shimmer"></div></div>
+    </div>
+
+    <div>
+      <h3>2 · Describe it</h3>
+      <label class="field" for="brief"><span class="muted small" style="font-weight:400">Exact words, names, numbers and colours become checklist items. Be specific; that is what you are paying for.</span></label>
+      <textarea id="brief" maxlength="700" placeholder="A square holiday card with exactly three cats on a blue sofa…"></textarea>
+      <div class="chips" id="chips" style="margin-top:10px"></div>
+      <div class="btn-row" style="margin-top:14px"><button class="btn" id="draft">Draft my checklist</button><span class="small muted" id="draft-note"></span></div>
+    </div>
+
+    <div id="step3" class="hidden">
+      <h3>3 · Agree the checklist</h3>
+      <p class="muted small" style="margin-top:0">This is the contract. Click any item to edit it. An image is paid for only if it passes <b>every</b> item. The checklist's hash is written into the PayPal order.</p>
+      <ul class="checklist" id="checklist"></ul>
+      <button class="btn ghost small" id="add" style="margin-top:10px">+ Add an item</button>
+    </div>
+
+    <div id="step4" class="hidden">
+      <h3>4 · Hold with PayPal</h3>
+      <div class="summary">
+        <div>
+          <div class="small muted">Images</div>
+          <div class="btn-row" id="qty" role="group" aria-label="Number of images"></div>
+        </div>
+        <div>
+          <div class="small muted">PayPal holds</div>
+          <div class="big" id="hold">$6.00</div>
+          <div class="small muted" id="perpass">$1.50 per image that passes · the rest is released</div>
+        </div>
+        <button class="btn btn-paypal" id="pay">Hold with <b>PayPal</b></button>
+      </div>
+      <p class="small muted" style="margin-top:10px">Sandbox demo: log in with any PayPal sandbox personal account (test login in the README). No real money moves. Images are made by real AI models.</p>
+      <div id="err" class="error hidden" style="margin-top:10px"></div>
+    </div>
+  </div>
+</main>
+<script type="module">
+import { $, $$, api, esc, pct, usd } from '/common.js';
+
+const EXAMPLES = [
+  ['Three cats card', 'A square holiday card: exactly three cats sitting on a blue sofa, one black, one orange, one white. No dogs. Printed text: "Happy Holidays from Wei Ling, Arjun & Mochi — Singapore 2026". Soft pastel flat illustration.'],
+  ['Bakery poster', 'A poster for my bakery\'s opening. A steaming cup of tea next to two slices of kaya toast. Text exactly: "Grand Opening · Sat 22 Nov · Kaya Toast $2.50 · Teh Tarik $1.80". Warm colours, clean layout.'],
+  ['Birthday card', 'A birthday card for my mum: a bunch of exactly 7 yellow tulips in a glass vase on a wooden table. Text: "Happy 60th, Linda! Love, Sam & Priya". Watercolour style.'],
+  ['Teacher thank-you', 'A thank-you card for a teacher: one red apple on a stack of exactly 3 books. Text: "Thank you, Ms. Okafor — Class 4B, 2026". Simple, bright, friendly.'],
+];
+let studio = null, quantity = 4, criteria = [], studios = [];
+
+$('#chips').innerHTML = EXAMPLES.map(([t], i) => `<button class="chip" data-i="${i}">${esc(t)}</button>`).join('');
+$$('#chips .chip').forEach(b => b.onclick = () => { $('#brief').value = EXAMPLES[b.dataset.i][1]; $('#brief').focus(); });
+const pre = new URLSearchParams(location.search).get('brief');
+if (pre) $('#brief').value = pre;
+
+function renderStudios() {
+  $('#studios').innerHTML = studios.map((s, i) => `<button class="studio" aria-pressed="${s.id === studio?.id}" data-id="${esc(s.id)}">
+      ${i === 0 && s.items_judged ? '<span class="tag paid best">Top rated</span>' : ''}
+      <div class="name"><span class="swatch" style="background:${esc(s.accent)}"></span>${esc(s.name)}</div>
+      <div class="meta">${esc(s.tagline)}</div>
+      <div class="rate">${pct(s.pass_rate)}</div>
+      <div class="meta">${s.items_judged ? `${s.items_passed}/${s.items_judged} images passed` : 'No settled orders yet'}${s.weakest_area ? ` · weakest: ${esc(s.weakest_area.category)}` : ''}</div>
+    </button>`).join('');
+  $$('#studios .studio').forEach(b => b.onclick = () => { studio = studios.find(s => s.id === b.dataset.id); renderStudios(); renderSummary(); });
+}
+
+function renderChecklist() {
+  $('#checklist').innerHTML = criteria.map((c, i) => `<li data-i="${i}">
+      <span class="n">${i + 1}</span>
+      <div><div contenteditable="plaintext-only" spellcheck="true" data-i="${i}">${esc(c.text)}</div><div class="cat">${esc(c.category || 'other')}</div></div>
+      <button class="x" title="Remove" data-i="${i}">×</button></li>`).join('');
+  $$('#checklist [contenteditable]').forEach(d => d.oninput = () => { criteria[d.dataset.i].text = d.textContent.trim(); });
+  $$('#checklist .x').forEach(b => b.onclick = () => { criteria.splice(Number(b.dataset.i), 1); renderChecklist(); });
+}
+
+function renderSummary() {
+  if (!studio) return;
+  const unit = Number(studio.unit_price);
+  $('#qty').innerHTML = [1, 2, 3, 4].map(n => `<button class="btn small ${n === quantity ? '' : 'ghost'}" data-n="${n}">${n}</button>`).join('');
+  $$('#qty button').forEach(b => b.onclick = () => { quantity = Number(b.dataset.n); renderSummary(); });
+  $('#hold').textContent = usd(unit * quantity);
+  $('#perpass').textContent = `${usd(unit)} per image that passes · the rest is released`;
+}
+
+$('#add').onclick = () => { criteria.push({ text: 'New requirement', category: 'other' }); renderChecklist(); $$('#checklist [contenteditable]').at(-1).focus(); };
+
+$('#draft').onclick = async () => {
+  const brief = $('#brief').value.trim();
+  if (brief.length < 10) { $('#draft-note').textContent = 'Write at least a sentence.'; return; }
+  $('#draft').disabled = true; $('#draft-note').innerHTML = '<span class="spin"></span> Turning your words into a checklist…';
+  try {
+    const out = await api('/api/criteria', { method: 'POST', body: { brief } });
+    criteria = out.criteria;
+    renderChecklist(); renderSummary();
+    $('#step3').classList.remove('hidden'); $('#step4').classList.remove('hidden');
+    $('#draft-note').textContent = '';
+    $('#step3').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (e) { $('#draft-note').textContent = e.message; }
+  $('#draft').disabled = false;
+};
+
+$('#pay').onclick = async () => {
+  $('#err').classList.add('hidden');
+  const items = criteria.filter(c => c.text && c.text.length >= 5);
+  if (!items.length) { $('#err').textContent = 'Keep at least one checklist item.'; $('#err').classList.remove('hidden'); return; }
+  $('#pay').disabled = true; $('#pay').innerHTML = '<span class="spin"></span> Opening PayPal…';
+  try {
+    const out = await api('/api/orders', { method: 'POST', body: { studio_id: studio.id, brief: $('#brief').value.trim(), criteria: items, quantity } });
+    location.href = out.approve_url;
+  } catch (e) {
+    $('#err').textContent = e.message; $('#err').classList.remove('hidden');
+    $('#pay').disabled = false; $('#pay').innerHTML = 'Hold with <b>PayPal</b>';
+  }
+};
+
+try {
+  const idx = await api('/api/index');
+  studios = idx.studios;
+  studio = studios[0];
+  renderStudios(); renderSummary();
+} catch (e) { $('#studios').innerHTML = `<p class="error">${esc(e.message)}</p>`; }
+</script>
+</body>
+</html>

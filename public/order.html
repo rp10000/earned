@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Order · Earned</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<main class="wrap" style="padding-top:36px;padding-bottom:64px">
+  <div id="root"><p class="muted"><span class="spin"></span> Loading order…</p></div>
+</main>
+<script type="module">
+import { $, $$, api, checksHtml, esc, moneyBar, time, usd } from '/common.js';
+
+const id = location.pathname.split('/').filter(Boolean)[1];
+const STAGES = [
+  ['held', 'Held by PayPal'],
+  ['generating', 'Studio making images'],
+  ['judging', 'AI inspection'],
+  ['settling', 'PayPal settling'],
+  ['settled', 'Settled'],
+];
+const RANK = { awaiting_approval: -1, authorized: 0, generating: 1, judging: 2, settling: 3, settled: 4, voided: 4, failed: 4, cancelled: -1 };
+const EVENT_LABEL = {
+  'paypal.order.created': 'PayPal order created (intent AUTHORIZE)',
+  'paypal.authorized': 'PayPal authorization: money held, not charged',
+  'generation.started': 'Studio started generating',
+  'generation.finished': 'Images delivered',
+  'judging.finished': 'Inspection finished',
+  'paypal.captured': 'PayPal partial capture (final_capture = true)',
+  'paypal.voided': 'PayPal authorization voided: nothing charged',
+  'paypal.refunded': 'PayPal refund for upheld appeal',
+  'appeal.rejected': 'Appeal reviewed: verdict stands',
+  'receipt.signed': 'Verdict receipt signed (Ed25519)',
+  'webhook.payment.capture.completed': 'Webhook: PAYMENT.CAPTURE.COMPLETED',
+  'webhook.payment.authorization.created': 'Webhook: PAYMENT.AUTHORIZATION.CREATED',
+  'webhook.payment.authorization.voided': 'Webhook: PAYMENT.AUTHORIZATION.VOIDED',
+  'webhook.checkout.order.approved': 'Webhook: CHECKOUT.ORDER.APPROVED',
+  'webhook.payment.capture.refunded': 'Webhook: PAYMENT.CAPTURE.REFUNDED',
+};
+let lastJson = '';
+
+function timeline(o) {
+  const r = RANK[o.status];
+  return `<div class="timeline">${STAGES.map(([k, label], i) => {
+    const cls = r > i || (i === 4 && r === 4) ? 'done' : r === i ? 'now' : '';
+    const text = i === 4 && o.status === 'voided' ? 'Released in full' : label;
+    return `<div class="tl ${cls}"><i></i>${text}</div>`;
+  }).join('')}</div>`;
+}
+
+function itemCard(o, it) {
+  const paid = it.verdict === 'pass';
+  const tag = it.verdict ? (paid ? '<span class="tag paid">Paid · ' + usd(o.unit_price) + '</span>' : '<span class="tag released">Not charged</span>') : (it.status === 'done' ? '<span class="tag held">Inspecting</span>' : '<span class="tag neutral">Making</span>');
+  const img = it.image ? `<img src="${esc(it.image)}" alt="Image ${it.idx + 1}" loading="lazy">` : `<div class="shimmer" style="position:absolute;inset:0"></div><span style="position:relative">${it.status === 'failed' ? 'Not delivered' : 'Generating…'}</span>`;
+  const appeal = it.appeal ? `<div class="${it.appeal.upheld ? 'notice' : 'small muted'}" style="margin-top:10px">Appeal ${it.appeal.upheld ? 'upheld: refunded ' + usd(it.appeal.refund?.amount) : 'reviewed: verdict stands'}. ${esc(it.appeal.explanation || '')}</div>`
+    : (paid && o.status === 'settled' ? `<button class="btn ghost small appeal" data-i="${it.idx}" style="margin-top:12px">Appeal this charge</button>` : '');
+  return `<div class="card item ${it.verdict === 'fail' ? 'failed' : ''}">
+    <div class="img">${img}<span class="badge">${tag}</span>${it.verdict ? `<span class="stamp">${paid ? 'PASSED' : 'FAILED'}</span>` : ''}</div>
+    <div class="body">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b>Image ${it.idx + 1}</b><span class="small muted">${it.verdict ? 'Checked against the signed list' : ''}</span></div>
+      ${checksHtml(it, o.criteria)}
+      ${it.transcript ? `<div class="transcript" title="Text the inspectors read in the image">Read in image: ${esc(it.transcript)}</div>` : ''}
+      ${appeal}
+    </div></div>`;
+}
+
+function render(data) {
+  const o = data.order;
+  const awaiting = o.status === 'awaiting_approval';
+  const passed = o.items.filter(i => i.verdict === 'pass').length;
+  const head = o.status === 'settled' ? `${passed} of ${o.items.length} passed. You paid ${usd(o.money.captured)}; ${usd(o.money.released)} went back to you.`
+    : o.status === 'voided' ? `Nothing passed, so nothing was charged. The full ${usd(o.money.authorized)} hold was released.`
+    : o.status === 'cancelled' ? 'This order was cancelled before PayPal approval. Nothing was held.'
+    : o.status === 'failed' ? 'This order failed: ' + (o.status_detail || '')
+    : awaiting ? 'Waiting for you to approve the hold on PayPal.'
+    : (o.status_detail || 'Working…');
+  $('#root').innerHTML = `
+    <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-start">
+      <div style="max-width:720px">
+        <div class="eyebrow">Order ${esc(o.id)} · ${esc(o.studio.name)}</div>
+        <h1 style="font-family:var(--serif);font-weight:400;font-size:clamp(28px,4vw,44px)">${esc(head)}</h1>
+        <p class="muted" style="margin:0">${esc(o.brief)}</p>
+      </div>
+      <div class="btn-row">
+        ${awaiting && o.paypal.approve_url ? `<a class="btn btn-paypal" href="${esc(o.paypal.approve_url)}">Approve hold with <b>PayPal</b></a>` : ''}
+        ${o.receipt_url ? `<a class="btn ghost" href="${esc(o.receipt_url)}">Signed receipt</a>` : ''}
+      </div>
+    </div>
+    <div style="margin-top:24px">${timeline(o)}</div>
+    <div class="card pad" style="margin-top:18px">${moneyBar(o.money)}</div>
+    <div class="items" style="margin-top:22px">${o.items.length ? o.items.map(it => itemCard(o, it)).join('') : (awaiting || o.status === 'cancelled' ? '' : '<p class="muted">Starting the studio…</p>')}</div>
+    <div class="grid c2" style="margin-top:26px;align-items:start">
+      <div class="card pad">
+        <h3>The signed checklist</h3>
+        <ol style="padding-left:20px;margin:8px 0 14px">${o.criteria.map(c => `<li style="margin:4px 0">${esc(c.text)}</li>`).join('')}</ol>
+        <div class="small muted">Contract hash (also in the PayPal order's custom_id)</div>
+        <div class="hash">${esc(o.contract_hash)}</div>
+      </div>
+      <div class="card pad">
+        <h3>PayPal trail</h3>
+        <ul class="log">${data.events.map(e => `<li><span class="t">${time(e.at)}</span><span><span class="k">${esc(EVENT_LABEL[e.type] || e.type)}</span>
+          <span class="d">${esc(Object.entries(e.data).filter(([k]) => /id|amount|released|status|passed|delivered|total/.test(k)).map(([k, v]) => `${k}: ${v}`).join(' · '))}</span></span></li>`).join('')}</ul>
+      </div>
+    </div>`;
+  $$('.appeal').forEach(b => b.onclick = () => appeal(Number(b.dataset.i)));
+}
+
+async function appeal(i) {
+  const reason = prompt('What on the checklist does this image not meet?');
+  if (reason === null) return;
+  try {
+    await api(`/api/orders/${id}/appeal`, { method: 'POST', body: { item: i, reason } });
+    await load(false);
+  } catch (e) { alert(e.message); }
+}
+
+async function load(advance = true) {
+  try {
+    const data = await api(`/api/orders/${id}${advance ? '' : '?advance=0'}`);
+    const j = JSON.stringify(data);
+    if (j !== lastJson) { lastJson = j; render(data); }
+    return data;
+  } catch (e) { $('#root').innerHTML = `<p class="error">${esc(e.message)}</p>`; }
+}
+
+// Each poll also drives the order forward on the server, so poll one request at a time.
+const TERMINAL = ['settled', 'voided', 'failed', 'cancelled'];
+let data = await load(false);
+while (data && !TERMINAL.includes(data.order.status)) {
+  await new Promise(r => setTimeout(r, data.order.status === 'awaiting_approval' ? 4000 : 1500));
+  data = (await load(data.order.status !== 'awaiting_approval')) || data;
+}
+</script>
+</body>
+</html>

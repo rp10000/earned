@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verdict receipt · Earned</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<main class="wrap narrow" style="padding-top:44px;padding-bottom:64px">
+  <div id="root"><p class="muted"><span class="spin"></span> Loading receipt…</p></div>
+</main>
+<script type="module">
+import { $, api, esc, moneyBar } from '/common.js';
+const id = location.pathname.split('/').filter(Boolean)[1];
+const b64 = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), c => c.charCodeAt(0));
+
+async function verifyInBrowser(data) {
+  const keys = await (await fetch(data.public_key_url)).json();
+  const jwk = keys.keys[0];
+  const key = await crypto.subtle.importKey('jwk', { kty: jwk.kty, crv: jwk.crv, x: jwk.x }, { name: 'Ed25519' }, false, ['verify']);
+  return crypto.subtle.verify({ name: 'Ed25519' }, key, b64(data.signature), new TextEncoder().encode(data.canonical));
+}
+
+try {
+  const data = await api(`/api/receipts/${id}`);
+  const r = data.receipt;
+  const passed = r.items.filter(i => i.verdict === 'pass').length;
+  $('#root').innerHTML = `
+    <div class="eyebrow">Verdict receipt · ${esc(r.receipt_id)}</div>
+    <h1 style="font-family:var(--serif);font-weight:400;font-size:clamp(30px,4.6vw,48px)">${passed} of ${r.items.length} passed. ${esc(r.merchant.name)} earned $${esc(r.money.captured)}.</h1>
+    <p id="ver" class="verified"><span class="spin"></span> Verifying signature in your browser…</p>
+    <div class="card pad" style="margin-top:16px">${moneyBar({ ...r.money, on_hold: 0 })}</div>
+    <div class="grid c2" style="margin-top:16px">
+      <div class="card pad"><h3>Contract</h3><p class="small muted" style="margin-top:0">${esc(r.contract.brief)}</p>
+        <ol style="padding-left:20px;margin:0 0 12px">${r.contract.criteria.map(c => `<li>${esc(c.text)}</li>`).join('')}</ol>
+        <div class="hash">sha256 ${esc(r.contract.hash)}</div></div>
+      <div class="card pad"><h3>PayPal (${esc(r.paypal.environment)})</h3>
+        <div class="small">Order <span class="hash">${esc(r.paypal.order_id)}</span></div>
+        <div class="small">Authorization <span class="hash">${esc(r.paypal.authorization_id)}</span></div>
+        <div class="small">Capture <span class="hash">${esc(r.paypal.capture_id || '— (voided)')}</span></div>
+        <div class="small" style="margin-top:8px">Settlement: <b>${esc(r.paypal.settlement.replace(/_/g, ' '))}</b></div>
+        <div class="small muted" style="margin-top:8px">Inspectors: ${esc(r.inspectors.judges.join(', '))} · tiebreaker ${esc(r.inspectors.tiebreaker)}</div></div>
+    </div>
+    <div class="card pad" style="margin-top:16px">
+      <h3>Signed payload</h3>
+      <p class="small muted" style="margin-top:0">Ed25519 over the canonical JSON below. Public key: <a href="${esc(data.public_key_url)}">${esc(data.public_key_url)}</a> (kid ${esc(data.key_id)}).</p>
+      <pre class="json">${esc(JSON.stringify(r, null, 2))}</pre>
+      <div class="small muted">Signature</div><div class="hash">${esc(data.signature)}</div>
+      <div class="btn-row" style="margin-top:14px"><a class="btn ghost small" href="/orders/${esc(r.receipt_id)}">See the images and evidence</a></div>
+    </div>`;
+  const ok = await verifyInBrowser(data).catch(() => null);
+  $('#ver').className = 'verified ' + (ok ? 'ok' : ok === false ? 'bad' : '');
+  $('#ver').textContent = ok ? '✓ Signature verified in your browser with the published public key' : ok === false ? '✕ Signature does not match: this receipt was altered' : (data.verified ? '✓ Signature verified by the server (your browser does not support Ed25519)' : '✕ Signature could not be verified');
+} catch (e) { $('#root').innerHTML = `<p class="error">${esc(e.message)}</p>`; }
+</script>
+</body>
+</html>
