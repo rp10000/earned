@@ -93,6 +93,7 @@ export async function createHold(env: Env, h: HoldRequest): Promise<{ id: string
       paypal: {
         experience_context: {
           brand_name: `${h.shopName} via Earned`.slice(0, 127),
+          locale: 'en-US',
           shipping_preference: 'NO_SHIPPING',
           user_action: 'CONTINUE',
           return_url: h.returnUrl,
