@@ -13,6 +13,7 @@ Rules:
 - If the request asks for words on the image, the first item must quote the exact text verbatim inside double quotes and say every word, name, number, price and date must appear exactly, in order, with nothing missing or added.
 - Separator symbols between phrases (· • | / — and similar) are layout, not content: say that line breaks or any separator may stand between the phrases.
 - Keep explicit numbers, names, colours, dates, prices and exclusions ("no dogs") from the request. Do not invent requirements the customer did not ask for, except one item that the image is free of garbled or unreadable extra text when any text is requested.
+- Context about who the image is for or why ("for my mum", "for my bakery's opening", "a birthday card") is not something to check, unless the customer asks for it to be visible in the image. Never add items like "presented as a card for Mum".
 - category is one of: text, count, subject, color, composition, style, safety, other.
 - required: true for explicit factual requirements (exact text, numbers, counts, named subjects, colours, exclusions, layout). required: false for style, mood or aesthetic wishes ("watercolour", "flat", "warm", "elegant"): those are inspected and reported to the buyer but never decide payment.
 Return JSON: {"title": short order title (max 60 chars), "criteria": [{"text": string, "category": string, "required": boolean}]}`;

@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { contractHash, normalizeCriteria } from '../src/criteria.ts';
 import { itemVerdict, mergeOpinions } from '../src/judge.ts';
 import { handleMcp } from '../src/mcp.ts';
+import { stripApprovalLinks } from '../src/agent.ts';
 import { wilsonLower } from '../src/quality.ts';
 import { generateKeyJwk, publicJwk, signReceipt, verifyReceipt } from '../src/receipts.ts';
 import { payerNote, settle } from '../src/settle.ts';
@@ -99,4 +100,11 @@ test('MCP server negotiates a version and lists the tools', async () => {
   assert.equal(create.annotations.readOnlyHint, false);
   const unknown = await (await call({ jsonrpc: '2.0', id: 3, method: 'nope' })).json() as any;
   assert.equal(unknown.error.code, -32601);
+});
+
+test('agent replies never carry raw PayPal approval links', () => {
+  const t = 'Approve below.\n\n[Approve payment on PayPal](https://www.sandbox.paypal.com/checkoutnow?token=ABC)\nThen tell me. https://www.sandbox.paypal.com/checkoutnow?token=XYZ';
+  const out = stripApprovalLinks(t);
+  assert.ok(!/paypal\.com/.test(out));
+  assert.match(out, /Approve below\./);
 });

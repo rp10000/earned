@@ -61,5 +61,13 @@ export async function runAgent(history: unknown, userText: string, ctx: Omit<Too
     }
   }
   const last = [...messages].reverse().find(m => m.role === 'assistant' && typeof m.content === 'string' && m.content.trim());
-  return { reply: (last?.content as string) || 'Done.', events, history: messages };
+  return { reply: stripApprovalLinks((last?.content as string) || 'Done.'), events, history: messages };
+}
+
+/** The PayPal button carries the approval link; keep raw checkout URLs out of the chat text. */
+export function stripApprovalLinks(text: string): string {
+  return text
+    .replace(/\[([^\]]*)\]\(https?:\/\/[^)]*paypal\.com[^)]*\)/gi, '')
+    .replace(/https?:\/\/\S*paypal\.com\/checkoutnow\S*/gi, '')
+    .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 }
