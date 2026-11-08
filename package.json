@@ -1,0 +1,21 @@
+{
+  "name": "earned",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pay AI only for what works: PayPal authorizations + AI acceptance judges + partial capture.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply earned --local",
+    "db:migrate:remote": "wrangler d1 migrations apply earned --remote",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "types": "wrangler types --include-env=false"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "wrangler": "^4.156.2"
+  }
+}

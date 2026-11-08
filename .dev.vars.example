@@ -1,0 +1,13 @@
+# Copy to .dev.vars for `wrangler dev`. Never commit the real file.
+# PayPal sandbox app (developer.paypal.com > Apps & Credentials > Sandbox)
+PAYPAL_CLIENT_ID=
+PAYPAL_CLIENT_SECRET=
+# Webhook ID returned when you register /webhooks/paypal (scripts/register-webhook.mjs)
+PAYPAL_WEBHOOK_ID=
+# Any OpenAI-compatible gateway that serves the image + vision models listed in src/shops.ts and src/judge.ts
+AI_API_BASE=https://api.apimart.ai
+AI_API_KEY=
+# Ed25519 private key (JWK JSON) used to sign verdict receipts: `node scripts/gen-receipt-key.mjs`
+RECEIPT_SIGNING_JWK=
+# Salt for hashing visitor IPs in rate limits
+IP_HASH_SALT=change-me
