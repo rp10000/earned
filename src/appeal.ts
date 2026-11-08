@@ -30,13 +30,14 @@ export async function appealItem(env: Env, orderId: string, idx: number, reason:
   const out = await chatJson<{ upheld?: boolean; failed_item_ids?: number[]; explanation?: string }>(env, TIEBREAKER, [
     { role: 'system', content: SYSTEM },
     { role: 'user', content: [
-      { type: 'text', text: 'Signed checklist:\n' + criteria.map(c => `${c.id}. ${c.text}`).join('\n') + `\n\nBuyer's reason: ${why}` },
+      { type: 'text', text: 'Signed checklist (only required items count):\n' + criteria.map(c => `${c.id}. ${c.text}${c.required === false ? ' (style preference, does not count)' : ''}`).join('\n') + `\n\nBuyer's reason: ${why}` },
       { type: 'image_url', image_url: { url: item.source_url! } },
     ] },
   ], { temperature: 0, timeoutMs: 90000 });
   await record(env, 'appeal', COST.tiebreak, orderId);
 
-  const upheld = out.upheld === true && Array.isArray(out.failed_item_ids) && out.failed_item_ids.some(id => criteria.some(c => c.id === Number(id)));
+  // Only required items can turn a paid image into a refund; style preferences never move money.
+  const upheld = out.upheld === true && Array.isArray(out.failed_item_ids) && out.failed_item_ids.some(id => criteria.some(c => c.id === Number(id) && c.required !== false));
   const appeal: Record<string, unknown> = {
     reason: why, upheld, inspector: TIEBREAKER,
     failed_item_ids: upheld ? out.failed_item_ids!.map(Number) : [],

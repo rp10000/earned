@@ -7,9 +7,13 @@ import { b64url, canonicalJson, fromB64url } from './util.ts';
 
 const ALG = { name: 'Ed25519' } as const;
 
+// Runtimes disagree about the JWK "alg" for Ed25519 ("Ed25519" vs "EdDSA"), so keys are imported
+// with only the fields that define the key.
+const bare = (k: JsonWebKey & { d?: string }, priv: boolean): JsonWebKey =>
+  (priv ? { kty: k.kty, crv: k.crv, x: k.x, d: k.d } : { kty: k.kty, crv: k.crv, x: k.x }) as JsonWebKey;
+
 export function publicJwk(env: Env): JsonWebKey {
-  const { d: _d, ...pub } = JSON.parse(env.RECEIPT_SIGNING_JWK) as JsonWebKey & { d?: string };
-  return { ...pub, key_ops: ['verify'], ext: true } as JsonWebKey;
+  return bare(JSON.parse(env.RECEIPT_SIGNING_JWK), false);
 }
 
 export async function keyId(env: Env): Promise<string> {
@@ -19,13 +23,13 @@ export async function keyId(env: Env): Promise<string> {
 
 export async function signReceipt(env: Env, receipt: Record<string, unknown>): Promise<{ json: string; sig: string }> {
   const json = canonicalJson(receipt);
-  const key = await crypto.subtle.importKey('jwk', JSON.parse(env.RECEIPT_SIGNING_JWK), ALG, false, ['sign']);
+  const key = await crypto.subtle.importKey('jwk', bare(JSON.parse(env.RECEIPT_SIGNING_JWK), true), ALG, false, ['sign']);
   const sig = await crypto.subtle.sign(ALG, key, new TextEncoder().encode(json));
   return { json, sig: b64url(sig) };
 }
 
 export async function verifyReceipt(pub: JsonWebKey, json: string, sig: string): Promise<boolean> {
-  const key = await crypto.subtle.importKey('jwk', pub, ALG, false, ['verify']);
+  const key = await crypto.subtle.importKey('jwk', bare(pub, false), ALG, false, ['verify']);
   return crypto.subtle.verify(ALG, key, fromB64url(sig), new TextEncoder().encode(json));
 }
 

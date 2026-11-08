@@ -66,7 +66,7 @@ function toolCard(ev) {
   }
   if (ev.tool === 'draft_acceptance_checklist') {
     return `<div class="tool"><div class="card"><div class="tname">draft_acceptance_checklist · this becomes the contract</div>
-      <ol style="margin:0;padding-left:20px">${r.criteria.map(c => `<li style="margin:3px 0">${esc(c.text)}</li>`).join('')}</ol></div></div>`;
+      <ol style="margin:0;padding-left:20px">${r.criteria.map(c => `<li style="margin:3px 0">${esc(c.text)}${c.required === false ? ' <span class="small muted">(preference, not billed)</span>' : ''}</li>`).join('')}</ol></div></div>`;
   }
   if (ev.tool === 'create_outcome_order') {
     return `<div class="tool" data-order="${esc(r.order_id)}"><div class="card"><div class="tname">create_outcome_order · ${esc(r.order_id)}</div>

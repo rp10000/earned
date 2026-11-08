@@ -19,7 +19,7 @@ You check ONE delivered image against a checklist that buyer and seller signed b
 Return JSON only: {"transcribed_text": string, "checks": [{"id": number, "pass": boolean, "evidence": string}]}`;
 
 function checklist(criteria: Criterion[]): string {
-  return 'Signed checklist:\n' + criteria.map(c => `${c.id}. ${c.text}`).join('\n');
+  return 'Signed checklist:\n' + criteria.map(c => `${c.id}. ${c.text}${c.required ? '' : ' (style preference)'}`).join('\n');
 }
 
 export async function askJudge(env: Env, model: string, imageUrl: string, criteria: Criterion[]): Promise<JudgeOpinion> {
@@ -66,6 +66,8 @@ export function mergeOpinions(criteria: Criterion[], opinions: JudgeOpinion[]): 
     });
     const passes = votes.filter(v => v.pass).length;
     if (votes.length >= 2 && passes !== 0 && passes !== votes.length) {
+      // Only items that decide payment are worth a tiebreak; split preferences are reported as split.
+      if (!c.required) return { id: c.id, pass: false, decided_by: 'split', evidence: votes.find(v => !v.pass)?.evidence || 'Inspectors disagreed.', votes };
       disputed.push(c.id);
       return { id: c.id, pass: false, decided_by: 'tiebreak', evidence: 'Inspectors disagreed.', votes };
     }
@@ -74,10 +76,15 @@ export function mergeOpinions(criteria: Criterion[], opinions: JudgeOpinion[]): 
     return { id: c.id, pass, decided_by: 'consensus', evidence: lead?.evidence || 'No inspector could read this image.', votes };
   });
   if (usable.length === 1) {
-    // Only one inspector answered: treat every item as disputed so a second opinion is always taken.
-    return { checks, disputed: criteria.map(c => c.id) };
+    // Only one inspector answered: every required item gets a second opinion from the tiebreaker.
+    return { checks, disputed: criteria.filter(c => c.required).map(c => c.id) };
   }
   return { checks, disputed };
+}
+
+/** An item is paid for when every required item passes; preferences never block payment. */
+export function itemVerdict(criteria: Criterion[], checks: ConsensusCheck[]): 'pass' | 'fail' {
+  return criteria.filter(c => c.required).every(c => checks.find(k => k.id === c.id)?.pass === true) ? 'pass' : 'fail';
 }
 
 export async function judgeImage(env: Env, imageUrl: string, criteria: Criterion[]): Promise<ItemVerdict & { calls: { judges: number; tiebreaks: number } }> {
@@ -95,7 +102,7 @@ export async function judgeImage(env: Env, imageUrl: string, criteria: Criterion
   }));
   const transcript = opinions.find(o => o.transcribed_text)?.transcribed_text || '';
   return {
-    verdict: checks.every(c => c.pass) ? 'pass' : 'fail',
+    verdict: itemVerdict(criteria, checks),
     transcript,
     checks,
     calls: { judges: opinions.length, tiebreaks: disputed.length },

@@ -32,7 +32,9 @@ export async function qualityIndex(env: Env) {
     if (r.gen_status !== 'done') s.undelivered++;
     const criteria = JSON.parse(r.criteria_json) as Criterion[];
     for (const c of (JSON.parse(r.checks_json || '[]') as ConsensusCheck[])) {
-      const cat = criteria.find(x => x.id === c.id)?.category || 'other';
+      const crit = criteria.find(x => x.id === c.id);
+      if (crit && crit.required === false) continue; // preferences are reported, not scored
+      const cat = crit?.category || 'other';
       const e = s.cats.get(cat) || { checked: 0, failed: 0 };
       e.checked++; if (!c.pass) e.failed++;
       s.cats.set(cat, e);

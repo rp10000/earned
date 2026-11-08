@@ -23,6 +23,8 @@ export interface Criterion {
   id: number;
   text: string;
   category: CriterionCategory;
+  /** Required items decide payment. Preferences (style, mood) are inspected and reported, never billed. */
+  required: boolean;
 }
 
 export interface JudgeCheck {
@@ -41,7 +43,7 @@ export interface JudgeOpinion {
 export interface ConsensusCheck {
   id: number;
   pass: boolean;
-  decided_by: 'consensus' | 'tiebreak';
+  decided_by: 'consensus' | 'tiebreak' | 'split';
   evidence: string;
   votes: { judge: string; pass: boolean; evidence: string }[];
 }

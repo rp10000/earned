@@ -11,9 +11,11 @@ import { SHOPS } from './shops.ts';
 import type { Env, OrderRow } from './types.ts';
 import { HttpError, json, now, originOf } from './util.ts';
 
+// Dynamic pages are served from their static shell. Use the extensionless path: asking the assets
+// binding for "/order.html" answers with a redirect to "/order", which would lose the order id.
 const PAGE_ROUTES: [RegExp, string][] = [
-  [/^\/orders\/ord_[a-z0-9]+\/?$/, '/order.html'],
-  [/^\/receipts\/ord_[a-z0-9]+\/?$/, '/receipt.html'],
+  [/^\/orders\/ord_[a-z0-9]+\/?$/, '/order'],
+  [/^\/receipts\/ord_[a-z0-9]+\/?$/, '/receipt'],
 ];
 
 async function body(req: Request): Promise<any> {
@@ -27,7 +29,7 @@ export default {
     const origin = originOf(req, env);
     try {
       for (const [re, file] of PAGE_ROUTES) {
-        if (re.test(path)) return env.ASSETS.fetch(new Request(new URL(file, url.origin), req));
+        if (re.test(path)) return env.ASSETS.fetch(new Request(new URL(file, url.origin), { headers: req.headers }));
       }
 
       // --- JSON API -----------------------------------------------------------------------
@@ -82,7 +84,7 @@ export default {
         return json({ ai_budget_usd: capUsd(env), ai_spent_usd: Math.round(used * 100) / 100, paypal: 'sandbox' });
       }
       if (path === '/.well-known/earned-receipt-key.json') {
-        return json({ keys: [{ ...publicJwk(env), kid: await keyId(env), alg: 'Ed25519', use: 'sig' }] }, 200, { 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' });
+        return json({ keys: [{ ...publicJwk(env), kid: await keyId(env), alg: 'EdDSA', use: 'sig' }] }, 200, { 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' });
       }
       if (path === '/mcp') return handleMcp(req, { env, origin, visitor: await visitorId(req, env) });
 

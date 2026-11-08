@@ -13,7 +13,8 @@ Rules:
 - If the request asks for words on the image, the first item must quote the exact text verbatim inside double quotes and say it must be spelled exactly, with nothing missing or added.
 - Keep explicit numbers, names, colours, dates, prices and exclusions ("no dogs") from the request. Do not invent requirements the customer did not ask for, except one item that the image is free of garbled or unreadable extra text when any text is requested.
 - category is one of: text, count, subject, color, composition, style, safety, other.
-Return JSON: {"title": short order title (max 60 chars), "criteria": [{"text": string, "category": string}]}`;
+- required: true for explicit factual requirements (exact text, numbers, counts, named subjects, colours, exclusions, layout). required: false for style, mood or aesthetic wishes ("watercolour", "flat", "warm", "elegant"): those are inspected and reported to the buyer but never decide payment.
+Return JSON: {"title": short order title (max 60 chars), "criteria": [{"text": string, "category": string, "required": boolean}]}`;
 
 export async function draftCriteria(env: Env, brief: string): Promise<{ title: string; criteria: Criterion[] }> {
   const out = await chatJson<{ title?: string; criteria?: { text?: string; category?: string }[] }>(env, CRITERIA_MODEL, [
@@ -28,9 +29,12 @@ export function normalizeCriteria(input: unknown): Criterion[] {
   const list = input.map((c: any, i) => {
     const text = clampText(typeof c === 'string' ? c : c?.text, 240);
     const cat = String(c?.category || 'other').toLowerCase() as CriterionCategory;
-    return { id: i + 1, text, category: CATEGORIES.includes(cat) ? cat : 'other' };
+    const category = CATEGORIES.includes(cat) ? cat : 'other';
+    const required = typeof c?.required === 'boolean' ? c.required : category !== 'style';
+    return { id: i + 1, text, category, required };
   }).filter(c => c.text.length >= 5);
   if (list.length < 1 || list.length > 8) throw new HttpError(400, 'Give between 1 and 8 checklist items.');
+  if (!list.some(c => c.required)) throw new HttpError(400, 'At least one checklist item must be required for payment.');
   return list.map((c, i) => ({ ...c, id: i + 1 }));
 }
 

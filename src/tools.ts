@@ -30,6 +30,7 @@ const criteriaSchema = {
     properties: {
       text: { type: 'string', description: 'One objectively checkable requirement' },
       category: { type: 'string', enum: ['text', 'count', 'subject', 'color', 'composition', 'style', 'safety', 'other'] },
+      required: { type: 'boolean', description: 'true: decides payment. false: style preference, inspected and reported but never billed.' },
     },
     required: ['text'],
   },

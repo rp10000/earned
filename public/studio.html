@@ -32,7 +32,7 @@
 
     <div id="step3" class="hidden">
       <h3>3 · Agree the checklist</h3>
-      <p class="muted small" style="margin-top:0">This is the contract. Click any item to edit it. An image is paid for only if it passes <b>every</b> item. The checklist's hash is written into the PayPal order.</p>
+      <p class="muted small" style="margin-top:0">This is the contract. Click any item to edit it. An image is paid for only if it passes <b>every required</b> item; style preferences are inspected and reported but never decide payment. The checklist's hash is written into the PayPal order.</p>
       <ul class="checklist" id="checklist"></ul>
       <button class="btn ghost small" id="add" style="margin-top:10px">+ Add an item</button>
     </div>
@@ -86,9 +86,11 @@ function renderStudios() {
 function renderChecklist() {
   $('#checklist').innerHTML = criteria.map((c, i) => `<li data-i="${i}">
       <span class="n">${i + 1}</span>
-      <div><div contenteditable="plaintext-only" spellcheck="true" data-i="${i}">${esc(c.text)}</div><div class="cat">${esc(c.category || 'other')}</div></div>
+      <div><div contenteditable="plaintext-only" spellcheck="true" data-i="${i}">${esc(c.text)}</div>
+        <div class="cat">${esc(c.category || 'other')} · <button class="req" data-i="${i}" title="Click to switch" style="border:0;background:none;padding:0;font:inherit;cursor:pointer;color:${c.required === false ? 'var(--ink-3)' : 'var(--paid)'}">${c.required === false ? 'preference: reported, not billed' : 'required for payment'}</button></div></div>
       <button class="x" title="Remove" data-i="${i}">×</button></li>`).join('');
   $$('#checklist [contenteditable]').forEach(d => d.oninput = () => { criteria[d.dataset.i].text = d.textContent.trim(); });
+  $$('#checklist .req').forEach(b => b.onclick = () => { const c = criteria[b.dataset.i]; c.required = c.required === false; renderChecklist(); });
   $$('#checklist .x').forEach(b => b.onclick = () => { criteria.splice(Number(b.dataset.i), 1); renderChecklist(); });
 }
 
@@ -101,7 +103,7 @@ function renderSummary() {
   $('#perpass').textContent = `${usd(unit)} per image that passes · the rest is released`;
 }
 
-$('#add').onclick = () => { criteria.push({ text: 'New requirement', category: 'other' }); renderChecklist(); $$('#checklist [contenteditable]').at(-1).focus(); };
+$('#add').onclick = () => { criteria.push({ text: 'New requirement', category: 'other', required: true }); renderChecklist(); $$('#checklist [contenteditable]').at(-1).focus(); };
 
 $('#draft').onclick = async () => {
   const brief = $('#brief').value.trim();

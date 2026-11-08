@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { contractHash, normalizeCriteria } from '../src/criteria.ts';
-import { mergeOpinions } from '../src/judge.ts';
+import { itemVerdict, mergeOpinions } from '../src/judge.ts';
 import { handleMcp } from '../src/mcp.ts';
 import { wilsonLower } from '../src/quality.ts';
 import { generateKeyJwk, publicJwk, signReceipt, verifyReceipt } from '../src/receipts.ts';
@@ -29,19 +29,22 @@ test('settlement never captures more than was authorized and refuses to settle e
 
 test('canonical JSON is stable regardless of key order', async () => {
   assert.equal(canonicalJson({ b: 1, a: { d: [2, { y: 1, x: 2 }], c: null } }), '{"a":{"c":null,"d":[2,{"x":2,"y":1}]},"b":1}');
-  const base = { shop_id: 's', brief: 'b', criteria: [{ id: 1, text: 'x', category: 'text' as const }], quantity: 2, unit_price_cents: 150, currency: 'USD', terms: 't' };
+  const base = { shop_id: 's', brief: 'b', criteria: [{ id: 1, text: 'x', category: 'text' as const, required: true }], quantity: 2, unit_price_cents: 150, currency: 'USD', terms: 't' };
   assert.equal(await contractHash(base), await contractHash({ ...base }));
   assert.notEqual(await contractHash(base), await contractHash({ ...base, quantity: 3 }));
 });
 
 test('criteria are renumbered, trimmed and bounded', () => {
   const c = normalizeCriteria([{ text: '  The text reads "Hi"  ', category: 'TEXT' }, 'abc', { text: 'Exactly two cats', category: 'weird' }]);
-  assert.deepEqual(c, [{ id: 1, text: 'The text reads "Hi"', category: 'text' }, { id: 2, text: 'Exactly two cats', category: 'other' }]);
+  assert.deepEqual(c, [{ id: 1, text: 'The text reads "Hi"', category: 'text', required: true }, { id: 2, text: 'Exactly two cats', category: 'other', required: true }]);
+  const s = normalizeCriteria([{ text: 'Watercolour style', category: 'style' }, { text: 'Says "Hi"', category: 'text', required: true }]);
+  assert.equal(s[0].required, false);
+  assert.throws(() => normalizeCriteria([{ text: 'Watercolour style', category: 'style' }]));
   assert.throws(() => normalizeCriteria([]));
   assert.throws(() => normalizeCriteria(Array.from({ length: 9 }, (_, i) => `criterion number ${i}`)));
 });
 
-const criteria: Criterion[] = [{ id: 1, text: 'Text reads "Hi"', category: 'text' }, { id: 2, text: 'Two cats', category: 'count' }];
+const criteria: Criterion[] = [{ id: 1, text: 'Text reads "Hi"', category: 'text', required: true }, { id: 2, text: 'Two cats', category: 'count', required: true }];
 const op = (judge: string, a: boolean, b: boolean): JudgeOpinion => ({ judge, transcribed_text: 'Hi', checks: [{ id: 1, pass: a, evidence: 'e1' }, { id: 2, pass: b, evidence: 'e2' }] });
 
 test('judges must agree; disagreements go to the tiebreaker', () => {
@@ -51,6 +54,17 @@ test('judges must agree; disagreements go to the tiebreaker', () => {
   const split = mergeOpinions(criteria, [op('a', true, true), op('b', true, false)]);
   assert.deepEqual(split.disputed, [2]);
   assert.equal(split.checks[1].pass, false);
+});
+
+test('style preferences are reported but never block payment or trigger a tiebreak', () => {
+  const withPref: Criterion[] = [...criteria, { id: 3, text: 'Flat illustration style', category: 'style', required: false }];
+  const op3 = (judge: string, a: boolean, b: boolean, c: boolean): JudgeOpinion => ({ judge, transcribed_text: '', checks: [{ id: 1, pass: a, evidence: '' }, { id: 2, pass: b, evidence: '' }, { id: 3, pass: c, evidence: 'painterly' }] });
+  const r = mergeOpinions(withPref, [op3('a', true, true, true), op3('b', true, true, false)]);
+  assert.deepEqual(r.disputed, []);
+  assert.equal(r.checks[2].decided_by, 'split');
+  assert.equal(itemVerdict(withPref, r.checks), 'pass');
+  const r2 = mergeOpinions(withPref, [op3('a', false, true, true), op3('b', false, true, true)]);
+  assert.equal(itemVerdict(withPref, r2.checks), 'fail');
 });
 
 test('a single working judge is never enough on its own', () => {

@@ -97,7 +97,7 @@ function render(data) {
     <div class="grid c2" style="margin-top:26px;align-items:start">
       <div class="card pad">
         <h3>The signed checklist</h3>
-        <ol style="padding-left:20px;margin:8px 0 14px">${o.criteria.map(c => `<li style="margin:4px 0">${esc(c.text)}</li>`).join('')}</ol>
+        <ol style="padding-left:20px;margin:8px 0 14px">${o.criteria.map(c => `<li style="margin:4px 0">${esc(c.text)}${c.required === false ? ' <span class="small muted">(preference, not billed)</span>' : ''}</li>`).join('')}</ol>
         <div class="small muted">Contract hash (also in the PayPal order's custom_id)</div>
         <div class="hash">${esc(o.contract_hash)}</div>
       </div>

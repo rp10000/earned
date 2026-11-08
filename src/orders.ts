@@ -114,6 +114,11 @@ async function releaseLease(env: Env, id: string): Promise<void> {
  */
 export async function advance(env: Env, id: string, budgetMs = 25000): Promise<OrderRow> {
   let order = await loadOrder(env, id);
+  if ((order.status === 'settled' || order.status === 'voided') && !order.receipt_sig) {
+    // Settlement happened but signing failed earlier: sign now so every settled order has a receipt.
+    await issueReceipt(env, id).catch(e => logEvent(env, id, 'error', { message: 'receipt: ' + (e as Error).message }));
+    return loadOrder(env, id);
+  }
   if (TERMINAL.includes(order.status) || order.status === 'awaiting_approval') return order;
   if (!(await takeLease(env, id, Math.ceil(budgetMs / 1000) + 40))) return order;
   const deadline = Date.now() + budgetMs;

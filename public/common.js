@@ -73,7 +73,10 @@ export function checksHtml(item, criteria) {
   if (!item.checks) return '';
   return `<ul class="checks">${item.checks.map(c => {
     const k = criteria.find(x => x.id === c.id);
-    return `<li><span class="${c.pass ? 'ok' : 'no'}">${c.pass ? '✓' : '✕'}</span><span>${esc(k ? k.text : 'Item ' + c.id)}${c.decided_by === 'tiebreak' ? '<span class="tb">tiebreak</span>' : ''}<span class="ev">${esc(c.evidence)}</span></span></li>`;
+    const pref = k && k.required === false;
+    const mark = pref ? `<span class="muted">${c.pass ? '✓' : '–'}</span>` : `<span class="${c.pass ? 'ok' : 'no'}">${c.pass ? '✓' : '✕'}</span>`;
+    const label = pref ? '<span class="tb" style="color:var(--ink-3)">preference · not billed</span>' : c.decided_by === 'tiebreak' ? '<span class="tb">tiebreak</span>' : '';
+    return `<li>${mark}<span>${esc(k ? k.text : 'Item ' + c.id)}${label}<span class="ev">${esc(c.evidence)}</span></span></li>`;
   }).join('')}</ul>`;
 }
 

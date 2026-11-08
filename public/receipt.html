@@ -36,7 +36,7 @@ try {
     <div class="card pad" style="margin-top:16px">${moneyBar({ ...r.money, on_hold: 0 })}</div>
     <div class="grid c2" style="margin-top:16px">
       <div class="card pad"><h3>Contract</h3><p class="small muted" style="margin-top:0">${esc(r.contract.brief)}</p>
-        <ol style="padding-left:20px;margin:0 0 12px">${r.contract.criteria.map(c => `<li>${esc(c.text)}</li>`).join('')}</ol>
+        <ol style="padding-left:20px;margin:0 0 12px">${r.contract.criteria.map(c => `<li>${esc(c.text)}${c.required === false ? ' <span class="small muted">(preference)</span>' : ''}</li>`).join('')}</ol>
         <div class="hash">sha256 ${esc(r.contract.hash)}</div></div>
       <div class="card pad"><h3>PayPal (${esc(r.paypal.environment)})</h3>
         <div class="small">Order <span class="hash">${esc(r.paypal.order_id)}</span></div>
