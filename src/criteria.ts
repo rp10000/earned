@@ -29,7 +29,7 @@ export async function draftCriteria(env: Env, brief: string): Promise<{ title: s
 export function normalizeCriteria(input: unknown): Criterion[] {
   if (!Array.isArray(input)) throw new HttpError(400, 'criteria must be a list');
   const list = input.map((c: any, i) => {
-    const text = clampText(typeof c === 'string' ? c : c?.text, 240);
+    const text = clampText(typeof c === "string" ? c : c?.text, 400);
     const cat = String(c?.category || 'other').toLowerCase() as CriterionCategory;
     const category = CATEGORIES.includes(cat) ? cat : 'other';
     const required = typeof c?.required === 'boolean' ? c.required : category !== 'style';
