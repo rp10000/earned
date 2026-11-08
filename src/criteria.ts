@@ -3,14 +3,15 @@ import type { Criterion, CriterionCategory, Env } from './types.ts';
 import { HttpError, canonicalJson, clampText, sha256Hex } from './util.ts';
 
 export const CRITERIA_MODEL = 'gpt-6-luna';
-export const TERMS_VERSION = 'earned-terms-v1';
+export const TERMS_VERSION = 'earned-terms-v2';
 const CATEGORIES: CriterionCategory[] = ['text', 'count', 'subject', 'color', 'composition', 'style', 'safety', 'other'];
 
 const SYSTEM = `You turn a customer's request for an AI-generated image (a card, poster or flyer) into an acceptance checklist.
 The checklist is a contract: the merchant is paid only for images that pass every item, and an AI inspector will check each item by looking at ONE image.
 Rules:
 - 3 to 6 items. Each item is one atomic, objectively checkable fact about the image. No taste words like "beautiful" or "high quality".
-- If the request asks for words on the image, the first item must quote the exact text verbatim inside double quotes and say it must be spelled exactly, with nothing missing or added.
+- If the request asks for words on the image, the first item must quote the exact text verbatim inside double quotes and say every word, name, number, price and date must appear exactly, in order, with nothing missing or added.
+- Separator symbols between phrases (· • | / — and similar) are layout, not content: say that line breaks or any separator may stand between the phrases.
 - Keep explicit numbers, names, colours, dates, prices and exclusions ("no dogs") from the request. Do not invent requirements the customer did not ask for, except one item that the image is free of garbled or unreadable extra text when any text is requested.
 - category is one of: text, count, subject, color, composition, style, safety, other.
 - required: true for explicit factual requirements (exact text, numbers, counts, named subjects, colours, exclusions, layout). required: false for style, mood or aesthetic wishes ("watercolour", "flat", "warm", "elegant"): those are inspected and reported to the buyer but never decide payment.

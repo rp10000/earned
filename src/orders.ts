@@ -145,8 +145,11 @@ export async function advance(env: Env, id: string, budgetMs = 25000): Promise<O
   return loadOrder(env, id);
 }
 
-function promptFor(order: OrderRow): string {
-  return `${order.brief}\n\nSquare format. If the request includes words, render them exactly as written, correctly spelled, with no other text.`;
+// Each of the studio's variations tries a different composition, like a designer showing options.
+const VARIATIONS = ['a centered composition', 'an off-center composition with generous empty space', 'a close-up composition', 'a wider composition with a simple background'];
+
+function promptFor(order: OrderRow, idx: number): string {
+  return `${order.brief}\n\nSquare format, ${VARIATIONS[idx % VARIATIONS.length]}. If the request includes words, render them exactly as written, correctly spelled, with no other text.`;
 }
 
 async function startGeneration(env: Env, order: OrderRow): Promise<void> {
@@ -160,7 +163,7 @@ async function startGeneration(env: Env, order: OrderRow): Promise<void> {
   const items = await loadItems(env, order.id);
   await Promise.all(items.filter(i => i.gen_status === 'pending').map(async i => {
     try {
-      const task = await submitImage(env, shop.model, promptFor(order));
+      const task = await submitImage(env, shop.model, promptFor(order, i.idx));
       await record(env, 'image:' + shop.model, shop.estCostUsd, order.id);
       await env.DB.prepare("UPDATE items SET task_id = ?, gen_status = 'submitted' WHERE order_id = ? AND idx = ?").bind(task, order.id, i.idx).run();
     } catch (e) {

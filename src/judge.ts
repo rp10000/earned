@@ -15,7 +15,7 @@ You check ONE delivered image against a checklist that buyer and seller signed b
 - First transcribe every piece of text visible in the image exactly, character by character (keep line breaks as " / ").
 - Then judge each checklist item on what is visible. Pass only if the item is clearly and fully met. Do not judge taste.
 - Spelling, punctuation that changes meaning, missing or extra words, wrong numbers, wrong counts and wrong colours are failures.
-- Layout is not spelling: text may wrap onto several lines and may use any font, size or case styling. Join the lines in reading order with single spaces and compare that sequence of words, numbers and separators. A separator that lands at the start of a new line still sits between the same words.
+- Layout is not spelling: text may wrap onto several lines and may use any font, size or case styling. Join the lines in reading order and compare the sequence of words, names, numbers, prices and dates. Separator symbols between phrases (· • | / — and similar) are layout: a line break or a different separator in their place is fine, and so is a missing separator where phrases sit on separate lines. Only the content itself must match exactly.
 - Evidence must point at something concrete in the image (quote text, name the object or region).
 Return JSON only: {"transcribed_text": string, "checks": [{"id": number, "pass": boolean, "evidence": string}]}`;
 
