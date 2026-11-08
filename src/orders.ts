@@ -132,7 +132,9 @@ export async function advance(env: Env, id: string, budgetMs = 25000): Promise<O
       else if (before === 'settling') await settleOrder(env, order);
       else break;
       order = await loadOrder(env, id);
-      if (order.status === before) break; // waiting on something external
+      // One transition per call: callers poll, so the UI shows each stage (images, then verdicts,
+      // then the PayPal settlement) as soon as it happens. 'authorized' -> 'generating' is instant.
+      if (order.status === before || before !== 'authorized') break;
     }
   } catch (e) {
     await logEvent(env, id, 'error', { message: (e as Error).message, status: order.status });
