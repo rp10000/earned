@@ -67,7 +67,7 @@ sequenceDiagram
     end
     PayPal-->>Earned: PAYMENT.CAPTURE.COMPLETED webhook (signature verified)
     Earned->>PayPal: POST /v1/payments/payouts (studio share, minus Earned's 10% fee)
-    PayPal-->>Earned: PAYMENT.PAYOUTS-ITEM.* webhook
+    Earned->>PayPal: GET /v1/payments/payouts/{batch_id} until final (PAYMENT.PAYOUTS-ITEM.* webhooks also accepted)
     Earned->>Buyer: images, verdicts, money paid vs released, Ed25519-signed receipt
 ```
 
