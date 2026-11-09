@@ -11,3 +11,7 @@ AI_API_KEY=
 RECEIPT_SIGNING_JWK=
 # Salt for hashing visitor IPs in rate limits
 IP_HASH_SALT=change-me
+# Optional: PayPal Payouts receivers per studio, e.g. sandbox business accounts (defaults show as UNCLAIMED)
+# STUDIO_PAYOUT_EMAILS={"lantern":"sb-xxxx@business.example.com"}
+# Optional: prefix for Payouts sender ids when several environments share one PayPal app
+# PAYOUT_ID_PREFIX=local-

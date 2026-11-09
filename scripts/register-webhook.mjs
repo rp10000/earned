@@ -18,7 +18,6 @@ const url = origin + '/webhooks/paypal';
 
 const list = await (await fetch(base + '/v1/notifications/webhooks', { headers: h })).json();
 const existing = (list.webhooks || []).find(w => w.url === url);
-if (existing) { console.log(existing.id); process.exit(0); }
 
 const events = [
   'CHECKOUT.ORDER.APPROVED',
@@ -28,7 +27,21 @@ const events = [
   'PAYMENT.CAPTURE.PENDING',
   'PAYMENT.CAPTURE.DENIED',
   'PAYMENT.CAPTURE.REFUNDED',
+  'PAYMENT.PAYOUTSBATCH.SUCCESS',
+  'PAYMENT.PAYOUTSBATCH.DENIED',
+  'PAYMENT.PAYOUTS-ITEM.SUCCEEDED',
+  'PAYMENT.PAYOUTS-ITEM.UNCLAIMED',
+  'PAYMENT.PAYOUTS-ITEM.FAILED',
+  'PAYMENT.PAYOUTS-ITEM.RETURNED',
+  'PAYMENT.PAYOUTS-ITEM.BLOCKED',
 ];
+if (existing) {
+  // Already registered: make sure it subscribes to every event Earned handles.
+  const u = await fetch(base + '/v1/notifications/webhooks/' + existing.id, { method: 'PATCH', headers: h, body: JSON.stringify([{ op: 'replace', path: '/event_types', value: events.map(name => ({ name })) }]) });
+  if (!u.ok) { console.error(JSON.stringify(await u.json(), null, 2)); process.exit(1); }
+  console.log(existing.id);
+  process.exit(0);
+}
 const r = await fetch(base + '/v1/notifications/webhooks', { method: 'POST', headers: h, body: JSON.stringify({ url, event_types: events.map(name => ({ name })) }) });
 const j = await r.json();
 if (!r.ok) { console.error(JSON.stringify(j, null, 2)); process.exit(1); }

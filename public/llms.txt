@@ -18,4 +18,6 @@
 - Unit price: $1.50 per image that passes (sandbox)
 - Inspectors: two vision models judge independently; a stronger third model breaks ties
 - Receipts: Ed25519-signed, public key at /.well-known/earned-receipt-key.json
+- Studios are paid their share (minus a 10% fee) with PayPal Payouts after settlement; upheld appeals are refunded to the buyer and recovered from the studio's next payout
+- Different from escrow or dispute services: every delivery is inspected before money moves, and payment is per item that passes
 - License: MIT

@@ -24,7 +24,8 @@
     "AI_API_BASE": "https://api.apimart.ai",
     "SPEND_CAP_USD": "15",
     "DAILY_ORDER_CAP": "80",
-    "VISITOR_DAILY_ORDERS": "4",
+    "DAILY_SPEND_CAP_USD": "1.2",
+    "VISITOR_DAILY_ORDERS": "3",
     "VISITOR_DAILY_CHAT": "40"
   }
   // Secrets (wrangler secret put): PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_WEBHOOK_ID,

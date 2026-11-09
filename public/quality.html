@@ -50,9 +50,10 @@ try {
   const idx = await api('/api/index');
   const t = idx.totals;
   $('#totals').innerHTML = [
-    [t.orders, 'settled orders'], [t.items, 'images judged'],
-    [t.items ? pct(t.passes / t.items) : '—', 'passed every item'],
+    [t.orders, 'settled PayPal orders'],
+    [`${t.passes} / ${t.items}`, `images passed every item (${t.items ? pct(t.passes / t.items) : '—'})`],
     [`${usd(t.captured)} / ${usd(t.authorized)}`, 'captured of held (sandbox)'],
+    [usd(t.paid_to_studios), 'paid to studios with PayPal Payouts'],
   ].map(([v, l]) => `<div class="card stat"><div class="v">${esc(v)}</div><div class="l">${esc(l)}</div></div>`).join('');
   $('#rows').innerHTML = idx.studios.map((s, i) => `<tr>
       <td class="rank">${i + 1}</td>
@@ -60,7 +61,7 @@ try {
       <td><div style="display:flex;gap:10px;align-items:center"><b>${pct(s.pass_rate)}</b><div class="bar" style="flex:1"><span style="width:${(s.pass_rate || 0) * 100}%;background:${esc(s.accent)}"></span></div></div></td>
       <td>${s.items_judged ? pct(s.confidence_floor) : '—'}</td>
       <td>${s.items_passed}/${s.items_judged}<div class="small muted">${s.settled_orders} orders</div></td>
-      <td>${s.earned_rate === null ? '—' : pct(s.earned_rate)}<div class="small muted">${usd(s.money.captured)} of ${usd(s.money.authorized)}</div></td>
+      <td>${s.earned_rate === null ? '—' : pct(s.earned_rate)}<div class="small muted">${usd(s.money.captured)} of ${usd(s.money.authorized)} · paid out ${usd(s.money.paid_to_studio)}</div></td>
       <td>${s.weakest_area ? `${esc(s.weakest_area.category)} <span class="small muted">${pct(s.weakest_area.fail_rate)} failed</span>` : '<span class="muted">—</span>'}</td>
     </tr>`).join('');
   $('#rank-note').textContent = 'Ranked by ' + idx.ranked_by.toLowerCase() + '. Earned rate = money captured ÷ money held.';

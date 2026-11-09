@@ -26,6 +26,23 @@ export async function assertBudget(env: Env, needUsd: number): Promise<void> {
   }
 }
 
+/** A daily slice of the budget, so one busy day (say, the day the hackathon gallery opens) can't
+ * use up what judges need later. Only new orders check it; chat and appeals stay available. */
+export function dailyCapUsd(env: Env): number {
+  return Number(env.DAILY_SPEND_CAP_USD || 1.2);
+}
+
+export async function spentToday(env: Env): Promise<number> {
+  const r = await env.DB.prepare('SELECT COALESCE(SUM(usd_micros),0) AS m FROM spend WHERE day = ?').bind(today()).first<{ m: number }>();
+  return (r?.m ?? 0) / 1e6;
+}
+
+export async function assertDailyBudget(env: Env, needUsd: number): Promise<void> {
+  if ((await spentToday(env)) + needUsd > dailyCapUsd(env)) {
+    throw new HttpError(503, "Today's share of the demo's AI budget is used up, so new orders open again at 00:00 UTC. Every finished order stays live: open one from the Quality Index to see the PayPal trail, both inspectors' evidence, the studio payout and the signed receipt.", 'daily_budget');
+  }
+}
+
 export async function record(env: Env, kind: string, usd: number, orderId?: string): Promise<void> {
   await env.DB.prepare('INSERT INTO spend (day, kind, usd_micros, order_id, created_at) VALUES (?,?,?,?,?)')
     .bind(today(), kind, Math.round(usd * 1e6), orderId ?? null, now()).run();

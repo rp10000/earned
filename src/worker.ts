@@ -3,7 +3,7 @@ import { appealItem } from './appeal.ts';
 import { COST, assertBudget, capUsd, record, spent, visitorId } from './budget.ts';
 import { draftCriteria } from './criteria.ts';
 import { handleMcp } from './mcp.ts';
-import { advance, cancelOrder, createOrder, loadOrder, logEvent, onApproved, orderEvents, orderView, sweep } from './orders.ts';
+import { advance, cancelOrder, createOrder, loadOrder, logEvent, onApproved, orderEvents, orderIdFromSenderId, orderView, recordPayoutStatus, sweep } from './orders.ts';
 import * as paypal from './paypal.ts';
 import { qualityIndex, recentReceipts } from './quality.ts';
 import { keyId, publicJwk, verifyReceipt } from './receipts.ts';
@@ -140,10 +140,22 @@ async function handleWebhook(env: Env, event: any): Promise<void> {
   const type = String(event?.event_type || '');
   const res = event?.resource || {};
   const related = res?.supplementary_data?.related_ids || {};
+  let order: OrderRow | null = null;
+  if (type.startsWith('PAYMENT.PAYOUTS')) {
+    // Payouts events carry our order id as the sender item / batch id.
+    const sender = String(res?.payout_item?.sender_item_id || res?.batch_header?.sender_batch_header?.sender_batch_id || '');
+    if (sender) order = await env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(orderIdFromSenderId(env, sender)).first<OrderRow>();
+    await logEvent(env, order?.id ?? null, 'webhook.' + type.toLowerCase(), {
+      id: event?.id, payout_batch_id: res?.payout_batch_id || res?.batch_header?.payout_batch_id,
+      status: res?.transaction_status || res?.batch_header?.batch_status, amount: res?.payout_item?.amount?.value,
+    });
+    if (order && type.startsWith('PAYMENT.PAYOUTS-ITEM') && res?.transaction_status) {
+      await recordPayoutStatus(env, order, String(res.transaction_status), res.payout_item_id, res?.errors?.name);
+    }
+    return;
+  }
   const paypalOrderId = type.startsWith('CHECKOUT.ORDER') ? res.id : related.order_id;
-  const order = paypalOrderId
-    ? await env.DB.prepare('SELECT * FROM orders WHERE paypal_order_id = ?').bind(paypalOrderId).first<OrderRow>()
-    : null;
+  if (paypalOrderId) order = await env.DB.prepare('SELECT * FROM orders WHERE paypal_order_id = ?').bind(paypalOrderId).first<OrderRow>();
   await logEvent(env, order?.id ?? null, 'webhook.' + type.toLowerCase(), { id: event?.id, resource_id: res?.id, status: res?.status, amount: res?.amount?.value });
   if (!order) return;
   if (type === 'CHECKOUT.ORDER.APPROVED' && order.status === 'awaiting_approval') {

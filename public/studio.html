@@ -65,7 +65,7 @@ const EXAMPLES = [
   ['Birthday card', 'A birthday card for my mum: a bunch of exactly 7 yellow tulips in a glass vase on a wooden table. Text: "Happy 60th, Linda! Love, Sam & Priya". Watercolour style.'],
   ['Teacher thank-you', 'A thank-you card for a teacher: one red apple on a stack of exactly 3 books. Text: "Thank you, Ms. Okafor — Class 4B, 2026". Simple, bright, friendly.'],
 ];
-let studio = null, quantity = 4, criteria = [], studios = [];
+let studio = null, quantity = 4, criteria = [], studios = [], recent = [];
 
 $('#chips').innerHTML = EXAMPLES.map(([t], i) => `<button class="chip" data-i="${i}">${esc(t)}</button>`).join('');
 $$('#chips .chip').forEach(b => b.onclick = () => { $('#brief').value = EXAMPLES[b.dataset.i][1]; $('#brief').focus(); });
@@ -129,13 +129,20 @@ $('#pay').onclick = async () => {
     const out = await api('/api/orders', { method: 'POST', body: { studio_id: studio.id, brief: $('#brief').value.trim(), criteria: items, quantity } });
     location.href = out.approve_url;
   } catch (e) {
-    $('#err').textContent = e.message; $('#err').classList.remove('hidden');
+    $('#err').textContent = e.message;
+    if (e.code === 'daily_budget' || e.code === 'budget_exhausted') {
+      // Point to a real finished order (ideally a partial capture) so the visit still shows the whole flow.
+      const r = recent.find(x => x.passed > 0 && x.passed < x.quantity) || recent[0];
+      if (r) $('#err').insertAdjacentHTML('beforeend', ` <a href="/orders/${esc(r.id)}">Open a finished order (${r.passed} of ${r.quantity} passed) →</a>`);
+    }
+    $('#err').classList.remove('hidden');
     $('#pay').disabled = false; $('#pay').innerHTML = 'Hold with <b>PayPal</b>';
   }
 };
 
 try {
   const idx = await api('/api/index');
+  recent = idx.recent || [];
   studios = idx.studios;
   studio = studios[0];
   renderStudios(); renderSummary();

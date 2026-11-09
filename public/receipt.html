@@ -43,6 +43,7 @@ try {
         <div class="small">Authorization <span class="hash">${esc(r.paypal.authorization_id)}</span></div>
         <div class="small">Capture <span class="hash">${esc(r.paypal.capture_id || '— (voided)')}</span></div>
         <div class="small" style="margin-top:8px">Settlement: <b>${esc(r.paypal.settlement.replace(/_/g, ' '))}</b></div>
+        ${r.paypal.payout_batch_id ? `<div class="small" style="margin-top:8px">Studio payout <span class="hash">${esc(r.paypal.payout_batch_id)}</span>: <b>$${esc(r.money.paid_to_studio)}</b> to the studio, $${esc(r.money.earned_fee)} Earned fee · ${esc(r.paypal.payout_status)}</div>` : ''}
         <div class="small muted" style="margin-top:8px">Inspectors: ${esc(r.inspectors.judges.join(', '))} · tiebreaker ${esc(r.inspectors.tiebreaker)}</div></div>
     </div>
     <div class="card pad" style="margin-top:16px">

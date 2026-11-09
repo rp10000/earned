@@ -6,6 +6,7 @@ import type { Env } from './types.ts';
 //   3. after the AI verdict: capture only the earned amount with final_capture=true (rest is released)
 //      or void the authorization when nothing passed
 //   4. refunds for upheld buyer appeals; webhooks confirm every step
+//   5. Payouts: the studio's share (captured minus Earned's fee) goes to the studio's PayPal
 
 const apiBase = (env: Env) => (env.PAYPAL_API_BASE || 'https://api-m.sandbox.paypal.com').replace(/\/$/, '');
 
@@ -156,6 +157,36 @@ export async function refund(env: Env, captureId: string, cents: number, request
     note_to_payer: note.slice(0, 255),
   }, requestId);
   return { id: r.id, status: r.status };
+}
+
+export interface PayoutRequest {
+  senderId: string;        // our order id (plus an optional environment prefix); used for both batch and item ids
+  receiver: string;        // studio's PayPal email
+  cents: number;
+  note: string;
+}
+
+/** Pays a studio its share. PayPal-Request-Id plus a sender_batch_id per order make it idempotent. */
+export async function createPayout(env: Env, p: PayoutRequest): Promise<{ batchId: string; status: string }> {
+  const r = await call(env, 'payout', 'POST', '/v1/payments/payouts', {
+    sender_batch_header: {
+      sender_batch_id: p.senderId,
+      email_subject: 'You have a payout from Earned',
+      email_message: p.note.slice(0, 1000),
+    },
+    items: [{
+      recipient_type: 'EMAIL',
+      receiver: p.receiver,
+      amount: { value: (p.cents / 100).toFixed(2), currency: 'USD' },
+      note: p.note.slice(0, 4000),
+      sender_item_id: p.senderId,
+    }],
+  }, `${p.senderId}:payout`);
+  return { batchId: r.batch_header.payout_batch_id, status: r.batch_header.batch_status };
+}
+
+export async function getPayoutBatch(env: Env, batchId: string): Promise<any> {
+  return call(env, 'get payout', 'GET', `/v1/payments/payouts/${encodeURIComponent(batchId)}`);
 }
 
 /** Verifies a webhook with PayPal's verify-webhook-signature API (no local cert handling needed). */

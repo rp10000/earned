@@ -33,3 +33,18 @@ export function payerNote(s: Settlement, total: number): string {
   const released = s.releaseCents > 0 ? ` $${(s.releaseCents / 100).toFixed(2)} of the hold was released.` : '';
   return `${s.passed} of ${total} items passed the signed checklist; you paid only for those.${released}`;
 }
+
+/** Earned keeps a platform fee; the studio gets the rest of what the buyer finally paid. */
+export const PLATFORM_FEE_BPS = 1000; // 10%
+
+export function studioShare(capturedCents: number, refundedCents: number, feeBps = PLATFORM_FEE_BPS): { net: number; fee: number; share: number } {
+  const net = Math.max(0, capturedCents - refundedCents);
+  const fee = Math.round((net * feeBps) / 10000);
+  return { net, fee, share: net - fee };
+}
+
+/** Refunds from appeals upheld after an earlier payout are recovered from the studio's next payout. */
+export function payoutAfterClawbacks(shareCents: number, outstandingCents: number): { amount: number; recovered: number } {
+  const recovered = Math.max(0, Math.min(shareCents, outstandingCents));
+  return { amount: shareCents - recovered, recovered };
+}

@@ -3,6 +3,7 @@ import { COST, assertBudget, hit, record } from './budget.ts';
 import { TIEBREAKER } from './judge.ts';
 import { issueReceipt, loadOrder, logEvent } from './orders.ts';
 import * as paypal from './paypal.ts';
+import { studioShare } from './settle.ts';
 import type { Criterion, Env, ItemRow } from './types.ts';
 import { HttpError, clampText, money, now } from './util.ts';
 
@@ -48,7 +49,9 @@ export async function appealItem(env: Env, orderId: string, idx: number, reason:
     appeal.refund = { id: r.id, status: r.status, amount: money(order.unit_price_cents) };
     await env.DB.batch([
       env.DB.prepare("UPDATE items SET verdict = 'fail', appeal_json = ? WHERE order_id = ? AND idx = ?").bind(JSON.stringify(appeal), orderId, idx),
-      env.DB.prepare('UPDATE orders SET refunded_cents = refunded_cents + ?, updated_at = ? WHERE id = ?').bind(order.unit_price_cents, now(), orderId),
+      // If the studio was already paid for this order, its share of the refund is recovered from its next payout.
+      env.DB.prepare('UPDATE orders SET refunded_cents = refunded_cents + ?, clawback_cents = clawback_cents + ?, updated_at = ? WHERE id = ?')
+        .bind(order.unit_price_cents, order.payout_status !== null ? studioShare(order.unit_price_cents, 0).share : 0, now(), orderId),
     ]);
     await logEvent(env, orderId, 'paypal.refunded', { item: idx, refund_id: r.id, amount: money(order.unit_price_cents) });
   } else {

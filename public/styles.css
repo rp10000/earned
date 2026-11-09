@@ -148,7 +148,7 @@ textarea:focus, input:focus, select:focus { outline: 2px solid color-mix(in srgb
 .hash { font-family: var(--mono); font-size: 12px; color: var(--ink-3); word-break: break-all; }
 
 /* order page */
-.timeline { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.timeline { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
 .tl { padding: 10px 12px; border-radius: 10px; background: var(--panel-2); color: var(--ink-3); font-size: 13.5px; font-weight: 600; display: flex; gap: 8px; align-items: center; }
 .tl i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: .5; flex: none; }
 .tl.done { color: var(--paid); background: var(--paid-bg); }
@@ -156,7 +156,8 @@ textarea:focus, input:focus, select:focus { outline: 2px solid color-mix(in srgb
 .tl.now { color: var(--held); background: var(--held-bg); }
 .tl.now i { opacity: 1; animation: pulse 1.2s infinite; }
 @keyframes pulse { 50% { transform: scale(1.6); opacity: .4; } }
-@media (max-width: 720px) { .timeline { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 900px) { .timeline { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 520px) { .timeline { grid-template-columns: 1fr 1fr; } }
 
 .items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 @media (max-width: 720px) { .items { grid-template-columns: 1fr; } }
@@ -228,3 +229,8 @@ footer.site .wrap { display: flex; gap: 18px; flex-wrap: wrap; justify-content: 
 .hidden { display: none !important; }
 .spin { width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: rot .8s linear infinite; display: inline-block; }
 @keyframes rot { to { transform: rotate(360deg); } }
+
+/* Studio payout (PayPal Payouts) */
+.payout { display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: baseline; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 14px; }
+.payout b { font-variant-numeric: tabular-nums; }
+.payout .st { font-family: var(--mono, ui-monospace, monospace); font-size: 12.5px; padding: 2px 8px; border-radius: 999px; background: var(--panel-2); color: var(--ink-2); }

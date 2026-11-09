@@ -1,16 +1,23 @@
 import { imageTask, submitImage } from './ai.ts';
-import { COST, assertBudget, hit, record } from './budget.ts';
+import { COST, assertBudget, assertDailyBudget, hit, record } from './budget.ts';
 import { TERMS_VERSION, contractHash, normalizeCriteria } from './criteria.ts';
 import { JUDGES, TIEBREAKER, judgeImage } from './judge.ts';
 import * as paypal from './paypal.ts';
 import { keyId, signReceipt } from './receipts.ts';
-import { payerNote, settle } from './settle.ts';
-import { MAX_QUANTITY, MIN_QUANTITY, shopById } from './shops.ts';
+import { PLATFORM_FEE_BPS, payerNote, payoutAfterClawbacks, settle, studioShare } from './settle.ts';
+import { MAX_QUANTITY, MIN_QUANTITY, payoutEmailFor, shopById } from './shops.ts';
 import type { ConsensusCheck, Criterion, Env, ItemRow, OrderRow, OrderStatus } from './types.ts';
 import { HttpError, clampText, money, newId, now, today } from './util.ts';
 
 const TERMINAL: OrderStatus[] = ['settled', 'voided', 'failed', 'cancelled'];
 const GENERATION_TIMEOUT_S = 8 * 60;
+// PayPal Payouts item statuses that will not change any more ('none' = nothing to pay out).
+const PAYOUT_FINAL = ['none', 'SUCCESS', 'UNCLAIMED', 'FAILED', 'RETURNED', 'BLOCKED', 'REFUNDED', 'REVERSED', 'DENIED', 'CANCELED'];
+
+/** A settled order whose studio payout has not reached a final PayPal status yet. */
+export function payoutPending(o: Pick<OrderRow, 'status' | 'payout_status'>): boolean {
+  return o.status === 'settled' && !PAYOUT_FINAL.includes(o.payout_status ?? '');
+}
 
 export async function logEvent(env: Env, orderId: string | null, type: string, data: unknown = {}): Promise<void> {
   await env.DB.prepare('INSERT INTO events (order_id, type, data_json, created_at) VALUES (?,?,?,?)')
@@ -57,7 +64,9 @@ export async function createOrder(env: Env, input: CreateOrderInput): Promise<Or
   const dayCount = await env.DB.prepare("SELECT COUNT(*) AS n FROM orders WHERE created_at >= ? AND status != 'cancelled'")
     .bind(Math.floor(Date.parse(today() + 'T00:00:00Z') / 1000)).first<{ n: number }>();
   if ((dayCount?.n ?? 0) >= Number(env.DAILY_ORDER_CAP || 80)) throw new HttpError(429, 'The demo has reached today\'s order limit. Try again tomorrow.', 'rate_limited');
-  await assertBudget(env, quantity * (shop.estCostUsd + COST.judge * JUDGES.length + COST.tiebreak));
+  const need = quantity * (shop.estCostUsd + COST.judge * JUDGES.length + COST.tiebreak);
+  await assertBudget(env, need);
+  await assertDailyBudget(env, need);
 
   const id = newId('ord');
   const contract = { shop_id: shop.id, brief, criteria, quantity, unit_price_cents: shop.unitPriceCents, currency: 'USD', terms: TERMS_VERSION };
@@ -117,6 +126,16 @@ export async function advance(env: Env, id: string, budgetMs = 25000): Promise<O
   if ((order.status === 'settled' || order.status === 'voided') && !order.receipt_sig) {
     // Settlement happened but signing failed earlier: sign now so every settled order has a receipt.
     await issueReceipt(env, id).catch(e => logEvent(env, id, 'error', { message: 'receipt: ' + (e as Error).message }));
+    return loadOrder(env, id);
+  }
+  if (payoutPending(order)) {
+    // After settlement the studio is paid with PayPal Payouts; later calls poll the payout status.
+    const due = order.payout_status === null || order.payout_status === 'sending' || now() - order.updated_at >= 4;
+    if (due && (await takeLease(env, id, 60))) {
+      try { await payStudio(env, order); }
+      catch (e) { await logEvent(env, id, 'error', { message: 'payout: ' + (e as Error).message }); }
+      finally { await releaseLease(env, id); }
+    }
     return loadOrder(env, id);
   }
   if (TERMINAL.includes(order.status) || order.status === 'awaiting_approval') return order;
@@ -243,6 +262,59 @@ async function settleOrder(env: Env, order: OrderRow): Promise<void> {
   await issueReceipt(env, order.id);
 }
 
+function payoutSenderId(env: Env, orderId: string): string {
+  return (env.PAYOUT_ID_PREFIX || '') + orderId;
+}
+
+/** Strips the environment prefix from a Payouts sender id to get our order id back. */
+export function orderIdFromSenderId(env: Env, senderId: string): string {
+  const prefix = env.PAYOUT_ID_PREFIX || '';
+  return prefix && senderId.startsWith(prefix) ? senderId.slice(prefix.length) : senderId;
+}
+
+async function payStudio(env: Env, order: OrderRow): Promise<void> {
+  const shop = shopById(order.shop_id)!;
+  const receiver = payoutEmailFor(env, shop);
+  if (order.payout_status === null) {
+    // Book the split first (guarded, so only one caller does it), then talk to PayPal.
+    const owed = await env.DB.prepare('SELECT COALESCE(SUM(clawback_cents),0) - COALESCE(SUM(recovered_cents),0) AS c FROM orders WHERE shop_id = ?')
+      .bind(order.shop_id).first<{ c: number }>();
+    const { fee, share } = studioShare(order.captured_cents, order.refunded_cents);
+    const { amount, recovered } = payoutAfterClawbacks(share, owed?.c ?? 0);
+    const booked = await env.DB.prepare('UPDATE orders SET payout_status = ?, payout_cents = ?, fee_cents = ?, recovered_cents = ?, updated_at = ? WHERE id = ? AND payout_status IS NULL')
+      .bind(amount > 0 ? 'sending' : 'none', amount, fee, recovered, now(), order.id).run();
+    if (!booked.meta.changes) return;
+    if (amount <= 0) {
+      await logEvent(env, order.id, 'payout.netted', { studio_share: money(share), recovered: money(recovered), fee: money(fee) });
+      await issueReceipt(env, order.id);
+      return;
+    }
+    order = await loadOrder(env, order.id);
+  }
+  if (order.payout_status === 'sending') {
+    const note = `${shop.name}: your share of Earned order ${order.id} (${money(order.captured_cents - order.refunded_cents)} paid by the buyer for items that passed, minus Earned's ${PLATFORM_FEE_BPS / 100}% fee${order.recovered_cents ? `, minus ${money(order.recovered_cents)} for an earlier upheld appeal` : ''}).`;
+    const p = await paypal.createPayout(env, { senderId: payoutSenderId(env, order.id), receiver, cents: order.payout_cents, note });
+    await env.DB.prepare('UPDATE orders SET payout_status = ?, payout_batch_id = ?, updated_at = ? WHERE id = ?').bind(p.status, p.batchId, now(), order.id).run();
+    await logEvent(env, order.id, 'paypal.payout.created', { payout_batch_id: p.batchId, amount: money(order.payout_cents), fee: money(order.fee_cents), receiver, status: p.status });
+    return;
+  }
+  if (!order.payout_batch_id) return;
+  const b = await paypal.getPayoutBatch(env, order.payout_batch_id);
+  const item = b?.items?.[0];
+  const status = String(item?.transaction_status || b?.batch_header?.batch_status || order.payout_status);
+  await recordPayoutStatus(env, order, status, item?.payout_item_id, item?.errors?.name);
+}
+
+/** Records a new payout status (from polling or a PAYMENT.PAYOUTS-ITEM.* webhook). */
+export async function recordPayoutStatus(env: Env, order: OrderRow, status: string, itemId?: string, reason?: string): Promise<void> {
+  if (!status || status === order.payout_status || order.payout_status === null || order.payout_status === 'none') return;
+  const r = await env.DB.prepare('UPDATE orders SET payout_status = ?, payout_item_id = COALESCE(?, payout_item_id), updated_at = ? WHERE id = ? AND payout_status = ?')
+    .bind(status, itemId ?? null, now(), order.id, order.payout_status).run();
+  if (!r.meta.changes) return;
+  await logEvent(env, order.id, 'paypal.payout.' + status.toLowerCase(), { payout_item_id: itemId, status, reason });
+  if (PAYOUT_FINAL.includes(status)) await issueReceipt(env, order.id);
+}
+
 export async function issueReceipt(env: Env, id: string): Promise<void> {
   const order = await loadOrder(env, id);
   const items = await loadItems(env, id);
@@ -275,6 +347,8 @@ export async function issueReceipt(env: Env, id: string): Promise<void> {
       captured: money(order.captured_cents),
       released: money(order.released_cents),
       refunded: money(order.refunded_cents),
+      paid_to_studio: money(order.payout_cents),
+      earned_fee: money(order.fee_cents),
       currency: order.currency,
     },
     paypal: {
@@ -283,6 +357,8 @@ export async function issueReceipt(env: Env, id: string): Promise<void> {
       authorization_id: order.paypal_authorization_id,
       capture_id: order.paypal_capture_id,
       settlement: order.status === 'voided' ? 'void' : 'partial_capture_final',
+      payout_batch_id: order.payout_batch_id,
+      payout_status: order.payout_status,
     },
   };
   const { json, sig } = await signReceipt(env, receipt);
@@ -334,6 +410,18 @@ export async function orderView(env: Env, order: OrderRow, origin: string) {
       checks: i.checks_json ? JSON.parse(i.checks_json) : null,
       appeal: i.appeal_json ? JSON.parse(i.appeal_json) : null,
     })),
+    payout: order.status === 'settled' ? {
+      status: order.payout_status,
+      final: !payoutPending(order),
+      studio_receives: money(order.payout_cents),
+      earned_fee: money(order.fee_cents),
+      fee_rate: PLATFORM_FEE_BPS / 10000,
+      recovered_for_earlier_refunds: money(order.recovered_cents),
+      clawed_back_later: money(order.clawback_cents),
+      receiver: payoutEmailFor(env, shop),
+      batch_id: order.payout_batch_id,
+      item_id: order.payout_item_id,
+    } : null,
     order_url: `${origin}/orders/${order.id}`,
     receipt_url: order.receipt_sig ? `${origin}/receipts/${order.id}` : null,
     created_at: order.created_at,
@@ -350,6 +438,10 @@ export async function orderEvents(env: Env, id: string) {
 export async function sweep(env: Env): Promise<void> {
   const r = await env.DB.prepare(`SELECT id FROM orders WHERE status IN ('authorized','generating','judging','settling') AND lease_until < ? ORDER BY updated_at LIMIT 5`).bind(now()).all<{ id: string }>();
   for (const { id } of r.results) await advance(env, id, 20000);
+  // Studio payouts: start them for newly settled orders and poll the ones PayPal is still processing.
+  const p = await env.DB.prepare(`SELECT id FROM orders WHERE status = 'settled' AND (payout_status IS NULL OR payout_status NOT IN (${PAYOUT_FINAL.map(() => '?').join(',')}))
+    AND lease_until < ? ORDER BY updated_at LIMIT 5`).bind(...PAYOUT_FINAL, now()).all<{ id: string }>();
+  for (const { id } of p.results) await advance(env, id, 20000);
   // Holds the buyer never approved expire on PayPal's side; mark them so they leave the queue.
   await env.DB.prepare("UPDATE orders SET status = 'cancelled', status_detail = 'PayPal approval was not completed within 3 hours.', updated_at = ? WHERE status = 'awaiting_approval' AND created_at < ?")
     .bind(now(), now() - 3 * 3600).run();

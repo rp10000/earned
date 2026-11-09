@@ -13,6 +13,9 @@ export interface Env {
   PUBLIC_ORIGIN?: string;            // optional override for links in MCP/agent replies
   SPEND_CAP_USD?: string;            // hard cap for AI spend across the whole demo
   DAILY_ORDER_CAP?: string;
+  DAILY_SPEND_CAP_USD?: string;      // daily slice of the AI budget, checked when an order is created
+  STUDIO_PAYOUT_EMAILS?: string;     // optional JSON {studio_id: email} for PayPal Payouts receivers
+  PAYOUT_ID_PREFIX?: string;         // keeps sender_batch_id unique across environments that share a PayPal app
   VISITOR_DAILY_ORDERS?: string;
   VISITOR_DAILY_CHAT?: string;
 }
@@ -86,6 +89,13 @@ export interface OrderRow {
   created_at: number;
   updated_at: number;
   settled_at: number | null;
+  payout_status: string | null;
+  payout_cents: number;
+  fee_cents: number;
+  recovered_cents: number;
+  clawback_cents: number;
+  payout_batch_id: string | null;
+  payout_item_id: string | null;
 }
 
 export interface ItemRow {

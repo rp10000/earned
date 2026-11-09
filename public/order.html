@@ -22,7 +22,8 @@ const STAGES = [
   ['generating', 'Studio making images'],
   ['judging', 'AI inspection'],
   ['settling', 'PayPal settling'],
-  ['settled', 'Settled'],
+  ['settled', 'Buyer settled'],
+  ['paid', 'Studio paid out'],
 ];
 const RANK = { awaiting_approval: -1, authorized: 0, generating: 1, judging: 2, settling: 3, settled: 4, voided: 4, failed: 4, cancelled: -1 };
 const EVENT_LABEL = {
@@ -34,6 +35,17 @@ const EVENT_LABEL = {
   'paypal.captured': 'PayPal partial capture (final_capture = true)',
   'paypal.voided': 'PayPal authorization voided: nothing charged',
   'paypal.refunded': 'PayPal refund for upheld appeal',
+  'paypal.payout.created': 'PayPal Payouts: studio share sent',
+  'paypal.payout.success': 'Payout completed',
+  'paypal.payout.unclaimed': 'Payout unclaimed: PayPal holds it for the studio',
+  'paypal.payout.pending': 'Payout pending at PayPal',
+  'paypal.payout.processing': 'Payout processing at PayPal',
+  'paypal.payout.failed': 'Payout failed',
+  'paypal.payout.returned': 'Payout returned',
+  'payout.netted': 'Studio share used to repay an earlier refund',
+  'webhook.payment.payoutsbatch.success': 'Webhook: PAYMENT.PAYOUTSBATCH.SUCCESS',
+  'webhook.payment.payouts-item.succeeded': 'Webhook: PAYMENT.PAYOUTS-ITEM.SUCCEEDED',
+  'webhook.payment.payouts-item.unclaimed': 'Webhook: PAYMENT.PAYOUTS-ITEM.UNCLAIMED',
   'appeal.rejected': 'Appeal reviewed: verdict stands',
   'receipt.signed': 'Verdict receipt signed (Ed25519)',
   'webhook.payment.capture.completed': 'Webhook: PAYMENT.CAPTURE.COMPLETED',
@@ -47,10 +59,34 @@ let lastJson = '';
 function timeline(o) {
   const r = RANK[o.status];
   return `<div class="timeline">${STAGES.map(([k, label], i) => {
-    const cls = r > i || (i === 4 && r === 4) ? 'done' : r === i ? 'now' : '';
-    const text = i === 4 && o.status === 'voided' ? 'Released in full' : label;
+    let cls = r > i || (i === 4 && r === 4) ? 'done' : r === i ? 'now' : '';
+    let text = i === 4 && o.status === 'voided' ? 'Released in full' : label;
+    if (i === 5) {
+      cls = o.status === 'settled' ? (o.payout?.final ? 'done' : 'now') : o.status === 'voided' ? 'done' : '';
+      if (o.status === 'voided') text = 'Nothing to pay out';
+    }
     return `<div class="tl ${cls}"><i></i>${text}</div>`;
   }).join('')}</div>`;
+}
+
+const PAYOUT_NOTE = {
+  SUCCESS: 'Completed.',
+  UNCLAIMED: 'Sent. This demo studio has no PayPal account, so PayPal holds the money for it to claim within 30 days.',
+  PENDING: 'PayPal is processing it.', PROCESSING: 'PayPal is processing it.', sending: 'Sending to PayPal…',
+  none: 'Nothing sent: this share repaid an earlier upheld appeal.',
+};
+
+function payoutHtml(o) {
+  const p = o.payout;
+  if (!p) return '';
+  if (p.status === null) return `<div class="payout"><span class="small muted"><span class="spin"></span> Paying the studio its share with PayPal Payouts…</span></div>`;
+  const recovered = Number(p.recovered_for_earlier_refunds) > 0 ? `<span>Repaid earlier refund <b>${usd(p.recovered_for_earlier_refunds)}</b></span>` : '';
+  return `<div class="payout">
+    <span>Studio received <b>${usd(p.studio_receives)}</b> via PayPal Payouts</span>
+    <span>Earned fee <b>${usd(p.earned_fee)}</b> (${Math.round(p.fee_rate * 100)}%)</span>${recovered}
+    <span class="st" title="PayPal Payouts item status">${esc(p.status)}</span>
+    <span class="small muted" style="flex-basis:100%">${esc(PAYOUT_NOTE[p.status] || '')}${p.batch_id ? ` Batch ${esc(p.batch_id)} · to ${esc(p.receiver)}` : ''}</span>
+  </div>`;
 }
 
 function itemCard(o, it) {
@@ -92,7 +128,7 @@ function render(data) {
       </div>
     </div>
     <div style="margin-top:24px">${timeline(o)}</div>
-    <div class="card pad" style="margin-top:18px">${moneyBar(o.money)}</div>
+    <div class="card pad" style="margin-top:18px">${moneyBar(o.money)}${payoutHtml(o)}</div>
     <div class="items" style="margin-top:22px">${o.items.length ? o.items.map(it => itemCard(o, it)).join('') : (awaiting || o.status === 'cancelled' ? '' : '<p class="muted">Starting the studio…</p>')}</div>
     <div class="grid c2" style="margin-top:26px;align-items:start">
       <div class="card pad">
@@ -104,7 +140,7 @@ function render(data) {
       <div class="card pad">
         <h3>PayPal trail</h3>
         <ul class="log">${data.events.map(e => `<li><span class="t">${time(e.at)}</span><span><span class="k">${esc(EVENT_LABEL[e.type] || e.type)}</span>
-          <span class="d">${esc(Object.entries(e.data).filter(([k]) => /id|amount|released|status|passed|delivered|total/.test(k)).map(([k, v]) => `${k}: ${v}`).join(' · '))}</span></span></li>`).join('')}</ul>
+          <span class="d">${esc(Object.entries(e.data).filter(([k, v]) => v !== undefined && v !== null && /id|amount|released|status|passed|delivered|total|fee/.test(k)).map(([k, v]) => `${k}: ${v}`).join(' · '))}</span></span></li>`).join('')}</ul>
       </div>
     </div>`;
   $$('.appeal').forEach(b => b.onclick = () => appeal(Number(b.dataset.i)));
@@ -130,10 +166,13 @@ async function load(advance = true) {
 
 // Each poll also drives the order forward on the server, so poll one request at a time.
 const TERMINAL = ['settled', 'voided', 'failed', 'cancelled'];
+const busy = o => !TERMINAL.includes(o.status) || (o.payout && !o.payout.final);
 let data = await load(false);
-while (data && !TERMINAL.includes(data.order.status)) {
-  await new Promise(r => setTimeout(r, data.order.status === 'awaiting_approval' ? 4000 : 1500));
-  data = (await load(data.order.status !== 'awaiting_approval')) || data;
+// Keep polling through the studio payout too (PayPal settles Payouts within seconds to a minute).
+for (let n = 0; data && busy(data.order) && n < 400; n++) {
+  const o = data.order;
+  await new Promise(r => setTimeout(r, o.status === 'awaiting_approval' ? 4000 : TERMINAL.includes(o.status) ? 3000 : 1500));
+  data = (await load(o.status !== 'awaiting_approval')) || data;
 }
 </script>
 </body>

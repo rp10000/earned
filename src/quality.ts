@@ -19,8 +19,9 @@ export function wilsonLower(passes: number, n: number, z = 1.96): number {
 interface Row { shop_id: string; order_id: string; criteria_json: string; verdict: string | null; checks_json: string | null; gen_status: string }
 
 export async function qualityIndex(env: Env) {
-  const orders = await env.DB.prepare(`SELECT shop_id, COUNT(*) AS n, SUM(authorized_cents) AS auth, SUM(captured_cents) AS cap, SUM(released_cents) AS rel, SUM(refunded_cents) AS ref
-    FROM orders WHERE status IN ('settled','voided') GROUP BY shop_id`).all<{ shop_id: string; n: number; auth: number; cap: number; rel: number; ref: number }>();
+  const orders = await env.DB.prepare(`SELECT shop_id, COUNT(*) AS n, SUM(authorized_cents) AS auth, SUM(captured_cents) AS cap, SUM(released_cents) AS rel, SUM(refunded_cents) AS ref,
+      SUM(payout_cents) AS paid, SUM(fee_cents) AS fee
+    FROM orders WHERE status IN ('settled','voided') GROUP BY shop_id`).all<{ shop_id: string; n: number; auth: number; cap: number; rel: number; ref: number; paid: number; fee: number }>();
   const items = await env.DB.prepare(`SELECT o.shop_id, o.id AS order_id, o.criteria_json, i.verdict, i.checks_json, i.gen_status
     FROM items i JOIN orders o ON o.id = i.order_id WHERE o.status IN ('settled','voided')`).all<Row>();
 
@@ -65,6 +66,8 @@ export async function qualityIndex(env: Env) {
         captured: money(o?.cap ?? 0),
         released: money(o?.rel ?? 0),
         refunded: money(o?.ref ?? 0),
+        paid_to_studio: money(o?.paid ?? 0),
+        earned_fees: money(o?.fee ?? 0),
       },
       earned_rate: o && o.auth ? (o.cap - o.ref) / o.auth : null,
       weakest_area: weakest && weakest.fail_rate > 0 ? weakest : null,
@@ -79,12 +82,13 @@ export async function qualityIndex(env: Env) {
     authorized: t.authorized + Number(r.money.authorized),
     captured: t.captured + Number(r.money.captured),
     released: t.released + Number(r.money.released),
-  }), { orders: 0, items: 0, passes: 0, authorized: 0, captured: 0, released: 0 });
+    paid_to_studios: t.paid_to_studios + Number(r.money.paid_to_studio),
+  }), { orders: 0, items: 0, passes: 0, authorized: 0, captured: 0, released: 0, paid_to_studios: 0 });
 
   return {
     ranked_by: 'Lower bound of the 95% confidence interval of the item pass rate, from settled PayPal orders only',
     studios: rows,
-    totals: { ...totals, authorized: totals.authorized.toFixed(2), captured: totals.captured.toFixed(2), released: totals.released.toFixed(2) },
+    totals: { ...totals, authorized: totals.authorized.toFixed(2), captured: totals.captured.toFixed(2), released: totals.released.toFixed(2), paid_to_studios: totals.paid_to_studios.toFixed(2) },
     generated_at: new Date().toISOString(),
   };
 }

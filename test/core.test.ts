@@ -6,7 +6,9 @@ import { handleMcp } from '../src/mcp.ts';
 import { stripApprovalLinks } from '../src/agent.ts';
 import { wilsonLower } from '../src/quality.ts';
 import { generateKeyJwk, publicJwk, signReceipt, verifyReceipt } from '../src/receipts.ts';
-import { payerNote, settle } from '../src/settle.ts';
+import { payerNote, payoutAfterClawbacks, settle, studioShare } from '../src/settle.ts';
+import { payoutPending } from '../src/orders.ts';
+import { payoutEmailFor, shopById } from '../src/shops.ts';
 import type { Criterion, Env, JudgeOpinion } from '../src/types.ts';
 import { canonicalJson } from '../src/util.ts';
 
@@ -107,4 +109,31 @@ test('agent replies never carry raw PayPal approval links', () => {
   const out = stripApprovalLinks(t);
   assert.ok(!/paypal\.com/.test(out));
   assert.match(out, /Approve below\./);
+});
+
+test('studio payout: captured minus refunds, minus a 10% fee', () => {
+  assert.deepEqual(studioShare(450, 0), { net: 450, fee: 45, share: 405 });
+  assert.deepEqual(studioShare(450, 150), { net: 300, fee: 30, share: 270 });
+  assert.deepEqual(studioShare(150, 300), { net: 0, fee: 0, share: 0 });
+});
+
+test('studio payout: earlier clawbacks are recovered from the next payout', () => {
+  assert.deepEqual(payoutAfterClawbacks(405, 0), { amount: 405, recovered: 0 });
+  assert.deepEqual(payoutAfterClawbacks(405, 135), { amount: 270, recovered: 135 });
+  assert.deepEqual(payoutAfterClawbacks(135, 270), { amount: 0, recovered: 135 });
+});
+
+test('payout is pending until PayPal reports a final item status', () => {
+  assert.equal(payoutPending({ status: 'settled', payout_status: null }), true);
+  assert.equal(payoutPending({ status: 'settled', payout_status: 'PENDING' }), true);
+  assert.equal(payoutPending({ status: 'settled', payout_status: 'UNCLAIMED' }), false);
+  assert.equal(payoutPending({ status: 'settled', payout_status: 'none' }), false);
+  assert.equal(payoutPending({ status: 'voided', payout_status: null }), false);
+});
+
+test('studio payout receivers can be overridden per environment', () => {
+  const shop = shopById('kite')!;
+  assert.equal(payoutEmailFor({}, shop), shop.payoutEmail);
+  assert.equal(payoutEmailFor({ STUDIO_PAYOUT_EMAILS: '{"kite":"kite@business.example.com"}' }, shop), 'kite@business.example.com');
+  assert.equal(payoutEmailFor({ STUDIO_PAYOUT_EMAILS: 'not json' }, shop), shop.payoutEmail);
 });

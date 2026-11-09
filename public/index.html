@@ -15,7 +15,7 @@
   <div class="wrap hero">
     <div class="eyebrow">PayPal + AI · pay-per-pass commerce</div>
     <h1 class="display">Pay AI only for<br><em>what works.</em></h1>
-    <p class="lede">Today you pay for AI before you know if it worked. Earned flips that. PayPal holds the money, independent AI inspectors check every result against the checklist you agreed on, and PayPal captures only what passed. The rest goes straight back to you.</p>
+    <p class="lede">Today you pay for AI before you know if it worked. Earned flips that. PayPal holds the money, two independent AI inspectors check every result against the checklist you agreed on, and PayPal captures only what passed. The rest goes straight back to you, and the studio is paid its share with PayPal Payouts.</p>
     <div class="btn-row" style="margin-top:26px">
       <a class="btn" href="/studio">Order a custom card</a>
       <a class="btn ghost" href="/agent">Let an AI agent buy it for you</a>
@@ -38,13 +38,14 @@
       <div>
         <div class="eyebrow">How it works</div>
         <h2 class="section">The price is decided by the result, not the seller.</h2>
-        <p class="muted">Every step is a real PayPal call: an Orders v2 authorization, a partial capture with <code>final_capture</code>, a void when nothing passed, refunds for upheld appeals, and webhooks that confirm each one.</p>
+        <p class="muted">Every step is a real PayPal call: an Orders v2 authorization, a partial capture with <code>final_capture</code>, a void when nothing passed, a Payouts batch to the studio, refunds for upheld appeals, and webhooks that confirm each one.</p>
       </div>
       <div class="steps">
         <div class="step"><div><h3>Agree the checklist</h3><p>AI turns "a card for my cats" into 3–6 checkable facts: exact text, counts, colours, exclusions. You edit it. Its hash is written into the PayPal order.</p></div></div>
         <div class="step"><div><h3>PayPal holds the money</h3><p>An authorization, not a charge. The studio knows the money is real; you know it hasn't moved.</p></div></div>
         <div class="step"><div><h3>Two AI inspectors check every result</h3><p>Two different vision models judge each image item by item and quote their evidence. If they disagree, a third, stronger model decides.</p></div></div>
         <div class="step"><div><h3>PayPal captures only what passed</h3><p>3 of 4 passed? You pay for 3; the rest of the hold is released. A signed receipt records the outcome forever.</p></div></div>
+        <div class="step"><div><h3>The studio gets paid</h3><p>PayPal Payouts sends the studio its share minus a 10% fee. If an appeal is upheld later, you are refunded at once and the studio repays it from its next payout.</p></div></div>
       </div>
     </div>
   </section>
@@ -58,6 +59,24 @@
         <div class="card pad"><h3>Buyers hesitate</h3><p class="muted">We run small AI tools. Our paying customers arrive from chat assistants on their phones, and they stall at the same moment: paying before they have seen the result. Free previews help; a guarantee that is enforced by the payment itself helps more.</p></div>
         <div class="card pad"><h3>Refunds are binary and slow</h3><p class="muted">Today a bad result means a refund request, a dispute, or nothing. Most results are not all bad; they are 3 of 4 good. Pay-per-pass settles that in seconds, in proportion, with evidence.</p></div>
         <div class="card pad"><h3>Agents can't complain</h3><p class="muted">When an AI agent buys from another AI, no human is watching. The only workable rule is: verify, then settle. Earned is that rule as a protocol, running on PayPal.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="soft">
+  <section>
+    <div class="wrap">
+      <div class="eyebrow">What makes it different</div>
+      <h2 class="section" style="max-width:860px">Not escrow, not a dispute desk. Inspection before payment.</h2>
+      <div class="grid c3" style="margin-top:26px">
+        <div class="card pad"><h3>Checked before anyone pays</h3><p class="muted">Escrow and dispute tools step in after a deal goes wrong and decide who is right. Earned checks every delivery against the agreed checklist before money moves, so a fair price never depends on someone complaining.</p></div>
+        <div class="card pad"><h3>Per item, not all-or-nothing</h3><p class="muted">Most AI output is 3 of 4 good. One PayPal partial capture charges for exactly the 3 and releases the rest. Facts decide the price; taste is reported but never billed.</p></div>
+        <div class="card pad"><h3>A reputation made of money</h3><p class="muted">The Quality Index counts only orders that settled through PayPal, so a studio can't buy its rank without paying for real passes. Agents read it before they buy.</p></div>
+      </div>
+      <div class="grid c3" style="margin-top:18px">
+        <div class="card pad"><span class="tag paid">Why studios say yes</span><h3 style="margin-top:12px">A failure costs about 1%</h3><p class="muted">Here an image costs the studio $0.007–0.02 to make and sells for $1.50. Not charging for a miss is cheap; buyers who would never pay up front will try you.</p></div>
+        <div class="card pad"><span class="tag paid">Why studios say yes</span><h3 style="margin-top:12px">Demand follows quality</h3><p class="muted">Agents pick studios by money-backed pass rate, so the studio that delivers gets the next order without buying ads.</p></div>
+        <div class="card pad"><span class="tag paid">Why studios say yes</span><h3 style="margin-top:12px">Little left to dispute</h3><p class="muted">Buyers were never charged for the work that failed, and every charge comes with quoted evidence and a signed receipt.</p></div>
       </div>
     </div>
   </section>
