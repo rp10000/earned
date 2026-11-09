@@ -17,7 +17,7 @@ export const SHOPS: Shop[] = [
   { id: 'lantern', name: 'Paper Lantern', tagline: 'Hand-lettered cards in seconds', model: 'qwen-image-2.0', unitPriceCents: 150, estCostUsd: 0.02, accent: '#e4572e', payoutEmail: 'lantern@studios.earned-demo.example.com' },
   { id: 'quickcard', name: 'Quickcard', tagline: 'Fast, cheap, cheerful', model: 'z-image-turbo', unitPriceCents: 150, estCostUsd: 0.01, accent: '#2e86ab', payoutEmail: 'quickcard@studios.earned-demo.example.com' },
   { id: 'kite', name: 'Kite & Ink', tagline: 'Posters for small businesses', model: 'flux-3-image-klein', unitPriceCents: 150, estCostUsd: 0.0072, accent: '#7b2d8b', payoutEmail: 'kite@studios.earned-demo.example.com' },
-  { id: 'northpole', name: 'Northpole Press', tagline: 'Premium festive illustration', model: 'gpt-image-2.6-flare', unitPriceCents: 150, estCostUsd: 0.0201, accent: '#1b7f5f', payoutEmail: 'northpole@studios.earned-demo.example.com' },
+  { id: 'northpole', name: 'Northpole Press', tagline: 'Premium festive illustration', model: 'gpt-image-2.6-flare', unitPriceCents: 150, estCostUsd: 0.046, accent: '#1b7f5f', payoutEmail: 'northpole@studios.earned-demo.example.com' },
 ];
 
 export const shopById = (id: string) => SHOPS.find(s => s.id === id);

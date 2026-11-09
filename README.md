@@ -37,7 +37,7 @@ We run a few small AI tools ourselves. Our paying customers mostly arrive from c
 
 ## Why studios would opt in
 
-- **A failed item costs them almost nothing.** In this demo an image costs the studio $0.007–0.02 in compute and sells for $1.50, so not charging for a failure is about 1% of the price. In return, buyers who would never pay up front will try them.
+- **A failed item costs them almost nothing.** In this demo an image costs the studio $0.007–0.045 in compute (measured from our gateway bills) and sells for $1.50, so not charging for a failure costs 0.5–3% of the price. In return, buyers who would never pay up front will try them.
 - **Demand follows quality.** Agents pick studios by money-backed pass rate, so a studio that delivers gets the next order without spending on ads.
 - **Fewer refunds and chargebacks.** Buyers were never charged for the work that failed, so there is little left to dispute.
 
